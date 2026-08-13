@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "enterprise-rag-baseline"
+version = "0.1.0"
+description = "A reproducible LangChain and Deep Agents baseline for EnterpriseRAG-Bench"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "datasets>=3.0",
+  "deepagents>=0.7,<0.8",
+  "faiss-cpu>=1.8",
+  "langchain>=1.3,<1.4",
+  "langchain-ollama>=1.1,<1.2",
+  "langchain-text-splitters>=1.1,<1.2",
+  "numpy>=1.26",
+  "pydantic>=2.8",
+  "sentence-transformers>=3.0",
+  "transformers>=4.45",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+
+[tool.hatch.build.targets.wheel]
+include = ["agent.py", "dataset.py", "eval.py", "main.py", "tools.py"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
