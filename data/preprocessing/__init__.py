@@ -1,6 +1,6 @@
 """Download, review, and clean source data before vector processing."""
 
-from .data_cleaning import normalize_text
+from .clean_data import normalize_text
 from .download import download_dataset
 from .review import load_frozen_questions, review_download
 

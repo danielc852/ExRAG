@@ -20,7 +20,7 @@ from ..artifacts import (
     write_manifest_atomic,
 )
 from ..models import ChunkRecord, DocumentRecord, ProcessingConfig
-from ..preprocessing.data_cleaning import normalize_text
+from ..preprocessing.clean_data import normalize_text
 
 
 def create_text_splitter(model_name: str, chunk_size: int, overlap: int):

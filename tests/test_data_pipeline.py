@@ -27,7 +27,7 @@ from data import (
     validate_index,
 )
 from data.artifacts import fingerprint, load_manifest, write_manifest_atomic
-from data.preprocessing.data_cleaning import normalize_text
+from data.preprocessing.clean_data import normalize_text
 from data.processing.embed import encode_chunk_shard
 from tools import FaissRetriever
 
