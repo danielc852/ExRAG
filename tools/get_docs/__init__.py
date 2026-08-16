@@ -1,12 +1,12 @@
 """Enterprise document retrieval tool."""
 
-from tools.retrieve_documents.retrieve_documents import (
+from tools.get_docs.tool import (
     FaissRetriever,
     create_retrieval_tool,
     format_chunks_for_agent,
     load_tool_description,
 )
-from tools.retrieve_documents.schema import (
+from tools.get_docs.schema import (
     RetrievalFilters,
     RetrievalResult,
     RetrieveDocumentsInput,

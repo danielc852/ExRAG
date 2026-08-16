@@ -10,7 +10,7 @@ from typing import Any
 
 from data.artifacts import ArtifactLayout
 from data.indexing import FAISS_NAME, SQLITE_NAME, validate_index
-from tools.retrieve_documents.schema import (
+from tools.get_docs.schema import (
     RetrievalFilters,
     RetrievalResult,
     RetrievedChunk,

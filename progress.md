@@ -69,7 +69,7 @@ v1 唔需要額外 planner、query rewriting、reranker 或 metadata routing。�
 | Dataset loading、normalization、chunking | 已實作，待端到端驗證 | `dataset.py` |
 | Deduplication、embedding、FAISS indexing | 已實作，待端到端驗證 | `dataset.py` |
 | Index manifest、resume validation | 已實作，待故障及重啟測試 | `dataset.py` |
-| Structured retrieval tool | 已實作，待真實查詢驗證 | `tools/retrieve_documents/` |
+| Structured retrieval tool | 已實作，待真實查詢驗證 | `tools/get_docs/` |
 | Simple agent | 已實作，待 Ollama smoke test | `agent.py` |
 | Deep agent | 已實作，但唔屬於 v1 驗收範圍 | `agent.py` |
 | `index`、`ask`、`eval` CLI | 已實作，待端到端驗證 | `main.py` |

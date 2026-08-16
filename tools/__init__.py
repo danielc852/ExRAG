@@ -1,6 +1,6 @@
 """Public exports for the agent tools package."""
 
-from tools.retrieve_documents import (
+from tools.get_docs import (
     FaissRetriever,
     RetrievalFilters,
     RetrievalResult,
