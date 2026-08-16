@@ -8,5 +8,6 @@ htmlcov/
 .cache/
 artifacts/
 runs/
+progress_track.md
 *.faiss
 *.sqlite3
