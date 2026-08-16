@@ -7,7 +7,7 @@ from agent.agent import (
     create_simple_agent,
 )
 from agent.llm import create_ollama_model
-from agent.runtime import extract_agent_result, run_agent
+from agent.runtime import agent_result, run_agent
 from agent.state import AgentMode, AgentRunResult, ToolCallTrace
 from agent.tools import create_agent_tools
 
@@ -21,6 +21,6 @@ __all__ = [
     "create_ollama_model",
     "create_rag_agent",
     "create_simple_agent",
-    "extract_agent_result",
+    "agent_result",
     "run_agent",
 ]

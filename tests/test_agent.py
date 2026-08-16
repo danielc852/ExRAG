@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from agent import AgentRunResult, create_agent_tools, extract_agent_result
-from agent.runtime import extract_agent_result as runtime_extract_agent_result
+from agent import AgentRunResult, agent_result, create_agent_tools
+from agent.runtime import agent_result as runtime_agent_result
 from agent.state import AgentRunResult as StateAgentRunResult
 
 
@@ -11,11 +11,11 @@ def test_agent_package_preserves_public_api_and_tool_registry():
     retrieval_tool = object()
 
     assert AgentRunResult is StateAgentRunResult
-    assert extract_agent_result is runtime_extract_agent_result
+    assert agent_result is runtime_agent_result
     assert create_agent_tools(retrieval_tool) == [retrieval_tool]
 
 
-def test_extract_agent_result_collects_stable_document_union_and_usage():
+def test_agent_result_collects_stable_document_union_and_usage():
     messages = [
         SimpleNamespace(
             type="ai",
@@ -43,7 +43,7 @@ def test_extract_agent_result_collects_stable_document_union_and_usage():
             usage_metadata={"input_tokens": 20, "output_tokens": 5},
         ),
     ]
-    result = extract_agent_result(
+    result = agent_result(
         messages,
         question="Question?",
         mode="simple",

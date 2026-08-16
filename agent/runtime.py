@@ -33,7 +33,7 @@ def _artifact_payload(artifact: Any) -> dict[str, Any] | None:
     return None
 
 
-def extract_agent_result(
+def agent_result(
     messages: list[Any],
     *,
     question: str,
@@ -130,7 +130,7 @@ def run_agent(
             config={"recursion_limit": 16 if mode == "deep" else 10},
         )
         messages = response.get("messages", []) if isinstance(response, dict) else []
-        return extract_agent_result(
+        return agent_result(
             list(messages),
             question=question,
             mode=mode,
