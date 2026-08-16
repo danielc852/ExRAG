@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import data.download as download_module
-import data.embedding as embedding_module
-import data.processing as processing_module
+import data.preprocessing.data_cleaning as cleaning_module
+import data.preprocessing.download as download_module
+import data.processing.process as embedding_module
 from data import (
     ArtifactLayout,
     DownloadConfig,
@@ -15,16 +15,20 @@ from data import (
     IndexConfig,
     ProcessingConfig,
     build_faiss_index,
+    clean_data,
     download_dataset,
     embed_chunks,
+    get_status,
     load_frozen_questions,
-    process_documents,
+    pre_data,
+    pre_store,
+    review_download,
+    run_process,
     validate_index,
 )
 from data.artifacts import fingerprint, load_manifest, write_manifest_atomic
-from data.embedding import encode_chunk_shard
-from data.pipeline import get_pipeline_status
-from data.processing import normalize_text
+from data.preprocessing.data_cleaning import normalize_text
+from data.processing.embed import encode_chunk_shard
 from tools import FaissRetriever
 
 
@@ -92,7 +96,7 @@ def fake_sources(monkeypatch):
         lambda name, **_kwargs: documents if name == "documents" else questions,
     )
     monkeypatch.setattr(
-        processing_module, "create_text_splitter", lambda *_args: WholeTextSplitter()
+        cleaning_module, "create_text_splitter", lambda *_args: WholeTextSplitter()
     )
     monkeypatch.setattr(
         embedding_module, "create_embedding_model", lambda *_args: FakeEmbedding()
@@ -112,10 +116,26 @@ def configs(root: Path):
 def run_fake_pipeline(root: Path):
     download, processing, embedding, index = configs(root)
     source_manifest = download_dataset(download)
-    processed_manifest = process_documents(processing)
+    processed_manifest = clean_data(processing)
     embedding_manifest = embed_chunks(embedding)
     index_manifest = build_faiss_index(index)
     return source_manifest, processed_manifest, embedding_manifest, index_manifest
+
+
+def test_simple_pipeline_entry_points(tmp_path, fake_sources):
+    root = tmp_path / "artifacts"
+    download, processing, embedding, index = configs(root)
+
+    data_manifests = pre_data(download, processing)
+    assert list(data_manifests) == ["download", "process"]
+
+    store_manifests = pre_store(embedding, index)
+    assert list(store_manifests) == ["embed", "index"]
+    assert all(stage["status"] == "complete" for stage in get_status(root).values())
+
+    second_root = tmp_path / "all-artifacts"
+    manifests = run_process(*configs(second_root))
+    assert list(manifests) == ["download", "process", "embed", "index"]
 
 
 def test_pipeline_builds_sharded_artifacts_and_retrieves(tmp_path, fake_sources, monkeypatch):
@@ -199,23 +219,34 @@ def test_completed_download_detects_corrupted_shard(tmp_path, fake_sources):
         download_dataset(download)
 
 
+def test_download_review_rejects_manifest_count_mismatch(tmp_path, fake_sources):
+    root = tmp_path / "artifacts"
+    download, *_rest = configs(root)
+    manifest = download_dataset(download)
+    manifest.stats["document_count"] += 1
+    write_manifest_atomic(ArtifactLayout(root), manifest)
+
+    with pytest.raises(ValueError, match="documents count"):
+        review_download(root)
+
+
 def test_process_rebuild_invalidates_downstream(tmp_path, fake_sources):
     root = tmp_path / "artifacts"
     _download, processing, _embedding, _index = configs(root)
     run_fake_pipeline(root)
-    process_documents(processing, rebuild=True)
+    clean_data(processing, rebuild=True)
     layout = ArtifactLayout(root)
     assert layout.processed.exists()
     assert not layout.embeddings.exists()
     assert not layout.index.exists()
-    status = get_pipeline_status(root)
+    status = get_status(root)
     assert status["process"]["status"] == "complete"
     assert status["embed"]["status"] == "missing"
 
 
 def test_missing_upstream_is_rejected(tmp_path):
     with pytest.raises(FileNotFoundError, match="prepare download"):
-        process_documents(ProcessingConfig(artifact_root=tmp_path / "artifacts"))
+        clean_data(ProcessingConfig(artifact_root=tmp_path / "artifacts"))
 
 
 def test_schema_v1_and_unsafe_artifact_roots_are_rejected(tmp_path):

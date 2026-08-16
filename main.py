@@ -22,10 +22,13 @@ from data import (
     EmbeddingConfig,
     IndexConfig,
     ProcessingConfig,
-    get_pipeline_status,
+    build_faiss_index,
+    clean_data,
+    download_dataset,
+    embed_chunks,
+    get_status,
     load_frozen_questions,
-    run_all,
-    run_stage,
+    run_process,
     validate_index,
 )
 from data.artifacts import load_manifest
@@ -225,16 +228,16 @@ def _index_config(args: argparse.Namespace) -> IndexConfig:
 
 def run_prepare(args: argparse.Namespace) -> int:
     if args.prepare_stage == "status":
-        print(json.dumps(get_pipeline_status(args.artifact_root), indent=2, sort_keys=True))
+        print(json.dumps(get_status(args.artifact_root), indent=2, sort_keys=True))
         return 0
-    config_factories = {
-        "download": _download_config,
-        "process": _processing_config,
-        "embed": _embedding_config,
-        "index": _index_config,
+    stages = {
+        "download": (download_dataset, _download_config),
+        "process": (clean_data, _processing_config),
+        "embed": (embed_chunks, _embedding_config),
+        "index": (build_faiss_index, _index_config),
     }
     if args.prepare_stage == "all":
-        manifests = run_all(
+        manifests = run_process(
             _download_config(args),
             _processing_config(args),
             _embedding_config(args),
@@ -246,9 +249,9 @@ def run_prepare(args: argparse.Namespace) -> int:
             stage: manifest.model_dump(mode="json") for stage, manifest in manifests.items()
         }
     else:
-        manifest = run_stage(
-            args.prepare_stage,
-            config_factories[args.prepare_stage](args),
+        runner, config_factory = stages[args.prepare_stage]
+        manifest = runner(
+            config_factory(args),
             resume=args.resume,
             rebuild=args.rebuild,
         )

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from data.artifacts import ArtifactLayout
-from data.indexing import FAISS_NAME, SQLITE_NAME, validate_index
+from data.processing import FAISS_NAME, SQLITE_NAME, validate_index
 from tools.get_docs.schema import (
     RetrievalFilters,
     RetrievalResult,

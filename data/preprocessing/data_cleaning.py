@@ -11,7 +11,7 @@ from typing import Iterator
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .artifacts import (
+from ..artifacts import (
     ArtifactLayout,
     StageManifest,
     begin_stage,
@@ -21,11 +21,15 @@ from .artifacts import (
     verify_manifest_files,
     write_manifest_atomic,
 )
-from .models import ChunkRecord, DocumentRecord, ProcessingConfig
+from ..models import ChunkRecord, DocumentRecord, ProcessingConfig
 
 
 def normalize_text(text: str) -> str:
-    normalized = unicodedata.normalize("NFKC", text).replace("\r\n", "\n").replace("\r", "\n")
+    normalized = (
+        unicodedata.normalize("NFKC", text)
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
     normalized = "\n".join(line.rstrip() for line in normalized.split("\n"))
     normalized = re.sub(r"\n{4,}", "\n\n\n", normalized)
     return normalized.strip()
@@ -87,11 +91,15 @@ def _write_parquet_atomic(rows: list[dict], destination: Path) -> None:
             ("content_hash", pa.string()),
         ]
     )
-    pq.write_table(pa.Table.from_pylist(rows, schema=schema), temporary, compression="zstd")
+    pq.write_table(
+        pa.Table.from_pylist(rows, schema=schema),
+        temporary,
+        compression="zstd",
+    )
     temporary.replace(destination)
 
 
-def process_documents(
+def clean_data(
     config: ProcessingConfig, *, resume: bool = True, rebuild: bool = False
 ) -> StageManifest:
     layout = ArtifactLayout(config.artifact_root)

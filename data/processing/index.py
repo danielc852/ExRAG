@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
-from .artifacts import (
+from ..artifacts import (
     ArtifactLayout,
     StageManifest,
     begin_stage,
@@ -19,39 +19,14 @@ from .artifacts import (
     verify_manifest_files,
     write_manifest_atomic,
 )
-from .models import IndexConfig
-
-
-FAISS_NAME = "chunks.faiss"
-SQLITE_NAME = "chunks.sqlite3"
-
-
-def _connect_store(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(path)
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS chunks (
-            integer_id INTEGER PRIMARY KEY,
-            chunk_id TEXT NOT NULL UNIQUE,
-            doc_id TEXT NOT NULL,
-            source_type TEXT NOT NULL,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            content_hash TEXT NOT NULL
-        )
-        """
-    )
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON chunks(doc_id)")
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source_type)")
-    return connection
-
-
-def _save_faiss_atomic(index, path: Path) -> None:
-    import faiss
-
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    faiss.write_index(index, str(temporary))
-    temporary.replace(path)
+from ..models import IndexConfig
+from .store import (
+    FAISS_NAME,
+    SQLITE_NAME,
+    connect_metadata_store,
+    load_or_create_vector_store,
+    save_vector_store,
+)
 
 
 def load_index_manifest(artifact_root: Path | str) -> StageManifest:
@@ -115,8 +90,6 @@ def _vector_pairs(manifest: StageManifest) -> dict[str, tuple[Path, Path]]:
 def build_faiss_index(
     config: IndexConfig, *, resume: bool = True, rebuild: bool = False
 ) -> StageManifest:
-    import faiss
-
     if config.batch_size < 1:
         raise ValueError("index batch size must be at least 1")
     layout = ArtifactLayout(config.artifact_root)
@@ -141,12 +114,8 @@ def build_faiss_index(
     dimension = int(upstream.metadata.get("embedding_dimension", 0))
     if dimension < 1:
         raise ValueError("Embedding manifest has no valid vector dimension")
-    index = (
-        faiss.read_index(str(faiss_path))
-        if faiss_path.exists()
-        else faiss.IndexIDMap2(faiss.IndexFlatIP(dimension))
-    )
-    connection = _connect_store(sqlite_path)
+    index = load_or_create_vector_store(faiss_path, dimension)
+    connection = connect_metadata_store(sqlite_path)
     row_count = int(connection.execute("SELECT COUNT(*) FROM chunks").fetchone()[0])
     checkpoint_count = int(manifest.stats.get("chunk_count", 0))
     if index.ntotal != row_count or row_count != checkpoint_count:
@@ -206,7 +175,7 @@ def build_faiss_index(
                 ],
             )
             connection.commit()
-            _save_faiss_atomic(index, faiss_path)
+            save_vector_store(index, faiss_path)
             manifest.completed_units.append(unit)
             manifest.stats["chunk_count"] = int(index.ntotal)
             write_manifest_atomic(layout, manifest)

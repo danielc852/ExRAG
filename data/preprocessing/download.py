@@ -10,17 +10,16 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .artifacts import (
+from ..artifacts import (
     ArtifactLayout,
     StageManifest,
     begin_stage,
     finalize_manifest,
-    load_manifest,
     shard_info,
     verify_manifest_files,
     write_manifest_atomic,
 )
-from .models import BenchmarkQuestion, DownloadConfig
+from ..models import DownloadConfig
 
 
 DATASET_NAME = "onyx-dot-app/EnterpriseRAG-Bench"
@@ -172,27 +171,3 @@ def download_dataset(
         }
     )
     return finalize_manifest(layout, manifest)
-
-
-def load_frozen_questions(artifact_root: Path | str) -> list[BenchmarkQuestion]:
-    layout = ArtifactLayout(artifact_root)
-    manifest = load_manifest(layout, "download")
-    if manifest.status != "complete":
-        raise ValueError("Downloaded source artifacts are incomplete")
-    verify_manifest_files(layout, manifest)
-    question_shards = [shard for shard in manifest.shards if shard.kind == "questions"]
-    if len(question_shards) != 1:
-        raise ValueError("Source manifest must contain exactly one questions artifact")
-    table = pq.read_table(layout.source / question_shards[0].path)
-    return [
-        BenchmarkQuestion(
-            question_id=str(row["question_id"]),
-            question_type=str(row["question_type"]),
-            source_types=list(row["source_types"] or []),
-            question=str(row["question"]),
-            expected_doc_ids=list(row["expected_doc_ids"] or []),
-            gold_answer=str(row["gold_answer"] or ""),
-            answer_facts=list(row["answer_facts"] or []),
-        )
-        for row in table.to_pylist()
-    ]
