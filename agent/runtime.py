@@ -1,96 +1,11 @@
-"""LangChain and Deep Agents RAG baselines."""
+"""Agent execution and provider-message normalization."""
 
 from __future__ import annotations
 
 import time
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, Field
-
-
-AgentMode = Literal["simple", "deep"]
-
-SYSTEM_PROMPT = """You are an enterprise knowledge assistant being evaluated on grounded RAG.
-Always search the enterprise corpus before answering. Base the answer only on retrieved
-evidence. If sources conflict, describe the conflict and identify which source says what.
-If evidence is insufficient, say that the information was not found. Do not invent facts,
-document identifiers, or citations. Answer directly and preserve important qualifiers.
-"""
-
-
-class ToolCallTrace(BaseModel):
-    tool_name: str
-    arguments: dict[str, Any] = Field(default_factory=dict)
-    retrieved_document_ids: list[str] = Field(default_factory=list)
-    latency_ms: float | None = None
-
-
-class AgentRunResult(BaseModel):
-    question_id: str | None = None
-    question: str
-    answer: str
-    document_ids: list[str] = Field(default_factory=list)
-    tool_calls: list[ToolCallTrace] = Field(default_factory=list)
-    latency_ms: float
-    model_name: str
-    agent_mode: AgentMode
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    error: str | None = None
-
-
-def create_ollama_model(
-    model_name: str = "qwen3:8b",
-    base_url: str = "http://localhost:11434",
-    temperature: float = 0,
-):
-    from langchain_ollama import ChatOllama
-
-    return ChatOllama(model=model_name, base_url=base_url, temperature=temperature)
-
-
-def create_simple_agent(model, retrieval_tool):
-    from langchain.agents import create_agent
-    from langchain.agents.middleware import ToolCallLimitMiddleware
-
-    return create_agent(
-        model=model,
-        tools=[retrieval_tool],
-        system_prompt=SYSTEM_PROMPT,
-        middleware=[
-            ToolCallLimitMiddleware(
-                tool_name="retrieve_documents", run_limit=3, exit_behavior="continue"
-            )
-        ],
-        name="enterprise_rag_simple",
-    )
-
-
-def create_deep_agent_baseline(model, retrieval_tool):
-    from deepagents import create_deep_agent
-    from deepagents.backends import StateBackend
-    from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitMiddleware
-
-    return create_deep_agent(
-        model=model,
-        tools=[retrieval_tool],
-        system_prompt=SYSTEM_PROMPT,
-        backend=StateBackend(),
-        middleware=[
-            ToolCallLimitMiddleware(
-                tool_name="retrieve_documents", run_limit=8, exit_behavior="continue"
-            ),
-            ModelCallLimitMiddleware(run_limit=8, exit_behavior="end"),
-        ],
-    )
-
-
-def create_rag_agent(mode: AgentMode, model, retrieval_tool):
-    if mode == "simple":
-        return create_simple_agent(model, retrieval_tool)
-    if mode == "deep":
-        return create_deep_agent_baseline(model, retrieval_tool)
-    raise ValueError(f"Unsupported agent mode: {mode}")
+from agent.state import AgentMode, AgentRunResult, ToolCallTrace
 
 
 def _message_content(message: Any) -> str:
@@ -204,6 +119,7 @@ def run_agent(
     model_name: str,
     question_id: str | None = None,
 ) -> AgentRunResult:
+    """Run one question and return a stable success or error result."""
     question = question.strip()
     if not question:
         raise ValueError("question must not be empty")
