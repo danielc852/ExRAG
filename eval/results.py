@@ -19,6 +19,18 @@ from .models import (
 )
 
 
+METRIC_DIRECTIONS = {
+    "mean_document_recall": "higher",
+    "mean_strict_extra_documents": "lower",
+    "failure_rate": "lower",
+    "mean_latency_ms": "lower",
+    "p95_latency_ms": "lower",
+    "mean_tool_calls": "diagnostic",
+    "mean_input_tokens": "lower",
+    "mean_output_tokens": "lower",
+}
+
+
 def _attribute(value: Any, name: str, default: Any = None) -> Any:
     if isinstance(value, dict):
         return value.get(name, default)
@@ -55,13 +67,12 @@ def normalize_experiment_results(
             raise ValueError("LangSmith experiment run has no question_id")
         run_error = _attribute(run, "error")
         output_error = outputs.get("error")
+        reference_example_id = _attribute(run, "reference_example_id")
         records.append(
             ExperimentRecord(
                 run_id=str(_attribute(run, "id")),
                 reference_example_id=(
-                    str(_attribute(run, "reference_example_id"))
-                    if _attribute(run, "reference_example_id")
-                    else None
+                    str(reference_example_id) if reference_example_id else None
                 ),
                 question_id=question_id,
                 ordinal=ordinal_by_question_id.get(
@@ -76,20 +87,13 @@ def normalize_experiment_results(
     return sorted(records, key=lambda record: (record.ordinal, record.question_id))
 
 
-def _numeric_values(records: list[ExperimentRecord], field: str) -> list[float]:
+def _numeric_values(
+    records: list[ExperimentRecord], field: str, *, feedback: bool = False
+) -> list[float]:
     values: list[float] = []
     for record in records:
-        value = record.outputs.get(field)
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            continue
-        values.append(float(value))
-    return values
-
-
-def _numeric_feedback(records: list[ExperimentRecord], key: str) -> list[float]:
-    values: list[float] = []
-    for record in records:
-        value = record.feedback.get(key)
+        source = record.feedback if feedback else record.outputs
+        value = source.get(field)
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             continue
         values.append(float(value))
@@ -119,9 +123,11 @@ def summarize_records(
         attempted=len(records),
         completed=len(records) - failures,
         failed=failures,
-        mean_document_recall=_mean(_numeric_feedback(records, "document_recall")),
+        mean_document_recall=_mean(
+            _numeric_values(records, "document_recall", feedback=True)
+        ),
         mean_strict_extra_documents=_mean(
-            _numeric_feedback(records, "strict_extra_documents")
+            _numeric_values(records, "strict_extra_documents", feedback=True)
         ),
         failure_rate=failures / len(records) if records else 0.0,
         mean_latency_ms=_mean(latency_values),
@@ -151,9 +157,9 @@ def _atomic_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     temporary.replace(path)
 
 
-def _safe_name(value: str) -> str:
+def safe_name(value: str, fallback: str = "experiment") -> str:
     normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-.")
-    return normalized or "experiment"
+    return normalized or fallback
 
 
 def write_experiment_artifacts(
@@ -167,7 +173,7 @@ def write_experiment_artifacts(
     experiment_name = str(_attribute(result, "experiment_name"))
     experiment_id = str(_attribute(result, "experiment_id"))
     experiment_url = str(_attribute(result, "url", ""))
-    output_dir = config.output_root / _safe_name(experiment_name)
+    output_dir = config.output_root / safe_name(experiment_name)
     summary = summarize_records(
         records,
         experiment_name=experiment_name,
@@ -236,19 +242,6 @@ def load_cloud_experiment(
     return project, records, _project_metadata(project)
 
 
-def _summary_metrics(summary: LangSmithSummary) -> dict[str, float | None]:
-    return {
-        "mean_document_recall": summary.mean_document_recall,
-        "mean_strict_extra_documents": summary.mean_strict_extra_documents,
-        "failure_rate": summary.failure_rate,
-        "mean_latency_ms": summary.mean_latency_ms,
-        "p95_latency_ms": summary.p95_latency_ms,
-        "mean_tool_calls": summary.mean_tool_calls,
-        "mean_input_tokens": summary.mean_input_tokens,
-        "mean_output_tokens": summary.mean_output_tokens,
-    }
-
-
 def compare_experiments(
     client: Any,
     experiment_a: str,
@@ -291,20 +284,10 @@ def compare_experiments(
         experiment_id=str(_attribute(project_b, "id")),
         dataset_name=dataset_name,
     )
-    directions = {
-        "mean_document_recall": "higher",
-        "mean_strict_extra_documents": "lower",
-        "failure_rate": "lower",
-        "mean_latency_ms": "lower",
-        "p95_latency_ms": "lower",
-        "mean_tool_calls": "diagnostic",
-        "mean_input_tokens": "lower",
-        "mean_output_tokens": "lower",
-    }
-    values_a = _summary_metrics(summary_a)
-    values_b = _summary_metrics(summary_b)
+    values_a = summary_a.model_dump()
+    values_b = summary_b.model_dump()
     metrics = {}
-    for key, direction in directions.items():
+    for key, direction in METRIC_DIRECTIONS.items():
         value_a = values_a[key]
         value_b = values_b[key]
         delta = value_b - value_a if value_a is not None and value_b is not None else None
@@ -336,7 +319,7 @@ def compare_experiments(
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     output_path = output_root / (
-        f"{timestamp}-{_safe_name(experiment_a)}-vs-{_safe_name(experiment_b)}.json"
+        f"{timestamp}-{safe_name(experiment_a)}-vs-{safe_name(experiment_b)}.json"
     )
     report = ComparisonReport(
         experiment_a=experiment_a,

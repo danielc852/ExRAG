@@ -8,9 +8,10 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Iterator, Sequence
 
 from langsmith.utils import LangSmithError
 
@@ -113,10 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     eval_parser = commands.add_parser("eval", help="Run resumable benchmark questions")
     _add_agent_arguments(eval_parser)
-    eval_scope = eval_parser.add_mutually_exclusive_group()
-    eval_scope.add_argument("--limit-questions", type=int, default=10)
-    eval_scope.add_argument("--all-questions", action="store_true")
-    eval_parser.add_argument("--question-type", action="append", dest="question_types")
+    _add_question_scope_arguments(eval_parser)
     eval_parser.add_argument("--output-dir", type=Path)
     eval_parser.add_argument(
         "--resume", action=argparse.BooleanOptionalAction, default=True
@@ -135,10 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = langsmith_commands.add_parser("run", help="Run a cloud experiment")
     _add_agent_arguments(run_parser)
     run_parser.add_argument("--dataset-name", default=DEFAULT_LANGSMITH_DATASET)
-    run_scope = run_parser.add_mutually_exclusive_group()
-    run_scope.add_argument("--limit-questions", type=int, default=10)
-    run_scope.add_argument("--all-questions", action="store_true")
-    run_parser.add_argument("--question-type", action="append", dest="question_types")
+    _add_question_scope_arguments(run_parser)
     run_parser.add_argument("--max-concurrency", type=int, default=1)
     run_parser.add_argument("--experiment-prefix")
     run_parser.add_argument("--output-root", type=Path, default=Path("runs/langsmith"))
@@ -162,6 +157,13 @@ def _add_agent_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--ollama-url", default=DEFAULT_OLLAMA_URL)
+
+
+def _add_question_scope_arguments(parser: argparse.ArgumentParser) -> None:
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--limit-questions", type=int, default=10)
+    scope.add_argument("--all-questions", action="store_true")
+    parser.add_argument("--question-type", action="append", dest="question_types")
 
 
 def validate_ollama(base_url: str, model_name: str) -> None:
@@ -255,21 +257,18 @@ def run_prepare(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_agent_stack(args: argparse.Namespace):
+@contextmanager
+def _agent_stack(args: argparse.Namespace) -> Iterator[Any]:
     validate_ollama(args.ollama_url, args.model)
-    retriever = FaissRetriever.load(args.artifact_root)
-    retrieval_tool = create_retrieval_tool(retriever, default_top_k=args.top_k)
-    model = create_ollama_model(args.model, args.ollama_url)
-    rag_agent = create_rag_agent(args.agent, model, retrieval_tool)
-    return retriever, rag_agent
+    with FaissRetriever.load(args.artifact_root) as retriever:
+        retrieval_tool = create_retrieval_tool(retriever, default_top_k=args.top_k)
+        model = create_ollama_model(args.model, args.ollama_url)
+        yield create_rag_agent(args.agent, model, retrieval_tool)
 
 
 def run_ask(args: argparse.Namespace) -> int:
-    retriever, rag_agent = _load_agent_stack(args)
-    try:
+    with _agent_stack(args) as rag_agent:
         result = run_agent(rag_agent, args.question, mode=args.agent, model_name=args.model)
-    finally:
-        retriever.close()
     if args.as_json:
         print(result.model_dump_json(indent=2))
     elif result.error:
@@ -299,8 +298,7 @@ def run_eval(args: argparse.Namespace) -> int:
     if manifest.metadata.get("source_fingerprint") != source.output_fingerprint:
         raise ValueError("Index and frozen question artifacts do not share the same source lineage")
     questions = load_frozen_questions(args.artifact_root)
-    retriever, rag_agent = _load_agent_stack(args)
-    try:
+    with _agent_stack(args) as rag_agent:
         config = EvaluationConfig(
             agent_mode=args.agent,
             output_dir=_evaluation_output_dir(args),
@@ -310,8 +308,6 @@ def run_eval(args: argparse.Namespace) -> int:
             model_name=args.model,
         )
         summary = run_evaluation(config, rag_agent, questions, manifest)
-    finally:
-        retriever.close()
     print(summary.model_dump_json(indent=2))
     return 0 if summary.failed == 0 else 1
 
@@ -354,8 +350,7 @@ def _run_langsmith_command(client, args: argparse.Namespace) -> int:
         print(report.model_dump_json(indent=2))
         return 0
     if args.langsmith_command == "run":
-        retriever, rag_agent = _load_agent_stack(args)
-        try:
+        with _agent_stack(args) as rag_agent:
             result = run_langsmith_experiment(
                 client,
                 LangSmithExperimentConfig(
@@ -375,8 +370,6 @@ def _run_langsmith_command(client, args: argparse.Namespace) -> int:
                 ),
                 rag_agent,
             )
-        finally:
-            retriever.close()
         print(result.model_dump_json(indent=2))
         return 0 if result.summary.failed == 0 else 1
     raise ValueError(f"Unknown LangSmith command: {args.langsmith_command}")
@@ -393,15 +386,14 @@ def run_langsmith(args: argparse.Namespace) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    handlers = {
+        "prepare": run_prepare,
+        "ask": run_ask,
+        "eval": run_eval,
+        "langsmith": run_langsmith,
+    }
     try:
-        if args.command == "prepare":
-            return run_prepare(args)
-        if args.command == "ask":
-            return run_ask(args)
-        if args.command == "eval":
-            return run_eval(args)
-        if args.command == "langsmith":
-            return run_langsmith(args)
+        return handlers[args.command](args)
     except (
         FileNotFoundError,
         FileExistsError,
@@ -411,8 +403,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     ) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
-    parser.error(f"Unknown command: {args.command}")
-    return 2
 
 
 if __name__ == "__main__":

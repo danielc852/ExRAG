@@ -131,7 +131,6 @@ def extract_agent_result(
     call_arguments: dict[str, tuple[str, dict[str, Any]]] = {}
     traces: list[ToolCallTrace] = []
     document_ids: list[str] = []
-    seen_document_ids: set[str] = set()
     input_tokens = 0
     output_tokens = 0
     usage_seen = False
@@ -171,9 +170,7 @@ def extract_agent_result(
             if not document_id:
                 continue
             retrieved_ids.append(document_id)
-            if document_id not in seen_document_ids:
-                seen_document_ids.add(document_id)
-                document_ids.append(document_id)
+        document_ids.extend(retrieved_ids)
         traces.append(
             ToolCallTrace(
                 tool_name=tool_name,
@@ -189,7 +186,7 @@ def extract_agent_result(
         question_id=question_id,
         question=question,
         answer=answer,
-        document_ids=document_ids,
+        document_ids=list(dict.fromkeys(document_ids)),
         tool_calls=traces,
         latency_ms=latency_ms,
         model_name=model_name,

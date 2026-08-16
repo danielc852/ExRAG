@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import subprocess
 from typing import Any, Callable
 
@@ -17,7 +16,7 @@ from .models import (
     LangSmithExperimentConfig,
     LangSmithExperimentResult,
 )
-from .results import normalize_experiment_results, write_experiment_artifacts
+from .results import normalize_experiment_results, safe_name, write_experiment_artifacts
 
 
 def build_langsmith_target(
@@ -47,10 +46,6 @@ def _git_commit() -> str:
         text=True,
     )
     return completed.stdout.strip() if completed.returncode == 0 else "unknown"
-
-
-def _model_slug(model_name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9._-]+", "-", model_name).strip("-.") or "model"
 
 
 def _experiment_metadata(
@@ -133,7 +128,7 @@ def run_langsmith_experiment(
         question_ids=question_ids,
     )
     prefix = config.experiment_prefix or (
-        f"enterprise-rag-{config.agent_mode}-{_model_slug(config.model_name)}"
+        f"enterprise-rag-{config.agent_mode}-{safe_name(config.model_name, 'model')}"
     )
     result = client.evaluate(
         build_langsmith_target(agent, config),

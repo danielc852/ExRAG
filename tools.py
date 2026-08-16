@@ -84,14 +84,14 @@ class FaissRetriever:
         placeholders = ",".join("?" for _ in integer_ids)
         clauses = [f"integer_id IN ({placeholders})"]
         parameters: list[Any] = list(integer_ids)
-        if filters and filters.source_types:
-            source_placeholders = ",".join("?" for _ in filters.source_types)
-            clauses.append(f"source_type IN ({source_placeholders})")
-            parameters.extend(filters.source_types)
-        if filters and filters.document_ids:
-            doc_placeholders = ",".join("?" for _ in filters.document_ids)
-            clauses.append(f"doc_id IN ({doc_placeholders})")
-            parameters.extend(filters.document_ids)
+        if filters:
+            for column, values in (
+                ("source_type", filters.source_types),
+                ("doc_id", filters.document_ids),
+            ):
+                if values:
+                    clauses.append(f"{column} IN ({','.join('?' for _ in values)})")
+                    parameters.extend(values)
         with self._database_lock:
             rows = self.connection.execute(
                 f"SELECT * FROM chunks WHERE {' AND '.join(clauses)}", parameters
@@ -133,7 +133,7 @@ class FaissRetriever:
             [query], convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False
         )
         vector = np.asarray(vector, dtype="float32")
-        candidate_count = min(max(top_k * 5, top_k), int(self.index.ntotal))
+        candidate_count = min(top_k * 5, int(self.index.ntotal))
         chunks: list[RetrievedChunk] = []
         while candidate_count:
             raw_scores, raw_ids = self.index.search(vector, candidate_count)

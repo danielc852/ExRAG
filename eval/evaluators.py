@@ -57,6 +57,13 @@ def _mean(values: list[int | float]) -> float | None:
     return fmean(values) if values else None
 
 
+def _metric_values(
+    feedback_rows: list[dict[str, Any]], key: str
+) -> list[int | float]:
+    values = (_number_or_none(row.get(key)) for row in feedback_rows)
+    return [value for value in values if value is not None]
+
+
 def percentile(values: list[int | float], percentile_value: float) -> float | None:
     if not values:
         return None
@@ -74,45 +81,27 @@ def aggregate_outputs(
     outputs: list[dict[str, Any]],
     reference_outputs: list[dict[str, Any]],
 ) -> dict[str, float | None]:
-    recalls: list[float] = []
-    extras: list[int] = []
-    latencies: list[int | float] = []
-    tool_counts: list[int] = []
-    input_tokens: list[int | float] = []
-    output_tokens: list[int | float] = []
-    failures = 0
-    for actual, expected in zip(outputs, reference_outputs):
-        document_ids = [str(value) for value in actual.get("document_ids", []) or []]
-        expected_ids = [
-            str(value) for value in expected.get("expected_doc_ids", []) or []
-        ]
-        recall = document_recall(document_ids, expected_ids)
-        extra_count = strict_extra_document_count(document_ids, expected_ids)
-        if recall is not None:
-            recalls.append(recall)
-        if extra_count is not None:
-            extras.append(extra_count)
-        latency = _number_or_none(actual.get("latency_ms"))
-        if latency is not None:
-            latencies.append(latency)
-        tool_counts.append(len(actual.get("tool_calls", []) or []))
-        input_count = _number_or_none(actual.get("input_tokens"))
-        output_count = _number_or_none(actual.get("output_tokens"))
-        if input_count is not None:
-            input_tokens.append(input_count)
-        if output_count is not None:
-            output_tokens.append(output_count)
-        failures += int(bool(actual.get("error")))
+    feedback_rows = [
+        {item["key"]: item["score"] for item in deterministic_evaluator(actual, expected)}
+        for actual, expected in zip(outputs, reference_outputs)
+    ]
+    recalls = _metric_values(feedback_rows, "document_recall")
+    extras = _metric_values(feedback_rows, "strict_extra_documents")
+    latencies = _metric_values(feedback_rows, "latency_ms")
     count = len(outputs)
     return {
         "mean_document_recall": _mean(recalls),
         "mean_strict_extra_documents": _mean(extras),
-        "failure_rate": failures / count if count else 0.0,
+        "failure_rate": (
+            sum(not row["run_success"] for row in feedback_rows) / count
+            if count
+            else 0.0
+        ),
         "mean_latency_ms": _mean(latencies),
         "p95_latency_ms": percentile(latencies, 0.95),
-        "mean_tool_calls": _mean(tool_counts),
-        "mean_input_tokens": _mean(input_tokens),
-        "mean_output_tokens": _mean(output_tokens),
+        "mean_tool_calls": _mean(_metric_values(feedback_rows, "tool_call_count")),
+        "mean_input_tokens": _mean(_metric_values(feedback_rows, "input_tokens")),
+        "mean_output_tokens": _mean(_metric_values(feedback_rows, "output_tokens")),
     }
 
 
