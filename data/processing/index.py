@@ -40,6 +40,7 @@ def validate_index(artifact_root: Path | str) -> StageManifest:
     manifest = load_manifest(layout, "index")
     if manifest.status != "complete":
         raise ValueError("Index stage is incomplete; run `python main.py prepare index`")
+    verify_manifest_files(layout, manifest)
     source = load_manifest(layout, "download")
     processed = load_manifest(layout, "process")
     embeddings = load_manifest(layout, "embed")
@@ -71,20 +72,12 @@ def validate_index(artifact_root: Path | str) -> StageManifest:
     return manifest
 
 
-def _vector_pairs(manifest: StageManifest) -> dict[str, tuple[Path, Path]]:
-    vectors = {
+def _vector_shards(manifest: StageManifest) -> dict[str, Path]:
+    return {
         Path(item.path).stem: Path(item.path)
         for item in manifest.shards
         if item.kind == "vectors"
     }
-    ids = {
-        Path(item.path).stem: Path(item.path)
-        for item in manifest.shards
-        if item.kind == "ids"
-    }
-    if vectors.keys() != ids.keys():
-        raise ValueError("Embedding vector and ID shard sets do not match")
-    return {unit: (vectors[unit], ids[unit]) for unit in sorted(vectors)}
 
 
 def build_faiss_index(
@@ -94,6 +87,7 @@ def build_faiss_index(
         raise ValueError("index batch size must be at least 1")
     layout = ArtifactLayout(config.artifact_root)
     upstream = validate_upstream(layout, "index")
+    source = load_manifest(layout, "download")
     processed = load_manifest(layout, "process")
     if processed.status != "complete":
         raise ValueError(
@@ -125,13 +119,13 @@ def build_faiss_index(
     chunk_shards = {
         Path(item.path).stem: item for item in processed.shards if item.kind == "chunks"
     }
-    pairs = _vector_pairs(upstream)
-    if chunk_shards.keys() != pairs.keys():
+    vector_shards = _vector_shards(upstream)
+    if chunk_shards.keys() != vector_shards.keys():
         connection.close()
         raise ValueError("Processed chunk and embedding shard sets do not match")
 
     try:
-        for unit, (vector_relative, id_relative) in pairs.items():
+        for unit, vector_relative in sorted(vector_shards.items()):
             if unit in manifest.completed_units:
                 continue
             chunk_table = pq.read_table(layout.processed / chunk_shards[unit].path)
@@ -139,21 +133,18 @@ def build_faiss_index(
             expected_ids = np.asarray(
                 [int(row["integer_id"]) for row in rows], dtype=np.int64
             )
-            ids = np.load(layout.embeddings / id_relative, mmap_mode="r", allow_pickle=False)
             vectors = np.load(
                 layout.embeddings / vector_relative, mmap_mode="r", allow_pickle=False
             )
-            if vectors.dtype != np.float32 or ids.dtype != np.int64:
-                raise ValueError(f"Unexpected vector or ID dtype in embedding shard {unit}")
-            if vectors.shape != (len(rows), dimension) or not np.array_equal(
-                ids, expected_ids
-            ):
+            if vectors.dtype != np.float32:
+                raise ValueError(f"Unexpected vector dtype in embedding shard {unit}")
+            if vectors.shape != (len(rows), dimension):
                 raise ValueError(f"Processed and embedding rows are misaligned for shard {unit}")
-            for start in range(0, len(ids), config.batch_size):
-                end = min(start + config.batch_size, len(ids))
+            for start in range(0, len(expected_ids), config.batch_size):
+                end = min(start + config.batch_size, len(expected_ids))
                 index.add_with_ids(
                     np.asarray(vectors[start:end], dtype=np.float32),
-                    np.asarray(ids[start:end], dtype=np.int64),
+                    expected_ids[start:end],
                 )
             connection.executemany(
                 """
@@ -199,11 +190,15 @@ def build_faiss_index(
     manifest.stats.update(
         {
             "chunk_count": int(index.ntotal),
-            "indexed_shard_count": len(pairs),
+            "indexed_shard_count": len(vector_shards),
         }
     )
     manifest.metadata = {
+        **source.metadata,
+        **processed.metadata,
         **upstream.metadata,
+        "source_fingerprint": source.output_fingerprint,
+        "processed_fingerprint": processed.output_fingerprint,
         "embedding_fingerprint": upstream.output_fingerprint,
         "index_type": "faiss.IndexIDMap2(IndexFlatIP)",
         "similarity": "cosine",

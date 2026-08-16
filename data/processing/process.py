@@ -18,7 +18,7 @@ from ..artifacts import (
     write_manifest_atomic,
 )
 from ..models import EmbeddingConfig
-from .embed import create_embedding_model, encode_chunk_shard
+from .embed_model import create_embedding_model, encode_chunk_shard
 
 
 def _save_npy_atomic(path: Path, values: np.ndarray) -> None:
@@ -71,30 +71,18 @@ def embed_chunks(
             raise ValueError("Embedding dimension changed between shards")
         dimension = int(vectors.shape[1])
         vector_path = layout.embeddings / "vectors" / f"{unit}.npy"
-        id_path = layout.embeddings / "ids" / f"{unit}.npy"
         _save_npy_atomic(vector_path, vectors.astype(np.float32, copy=False))
-        _save_npy_atomic(id_path, ids)
         min_id = int(ids.min()) if ids.size else None
         max_id = int(ids.max()) if ids.size else None
-        manifest.shards.extend(
-            [
-                shard_info(
-                    kind="vectors",
-                    path=vector_path,
-                    base_dir=layout.embeddings,
-                    row_count=len(ids),
-                    min_id=min_id,
-                    max_id=max_id,
-                ),
-                shard_info(
-                    kind="ids",
-                    path=id_path,
-                    base_dir=layout.embeddings,
-                    row_count=len(ids),
-                    min_id=min_id,
-                    max_id=max_id,
-                ),
-            ]
+        manifest.shards.append(
+            shard_info(
+                kind="vectors",
+                path=vector_path,
+                base_dir=layout.embeddings,
+                row_count=len(ids),
+                min_id=min_id,
+                max_id=max_id,
+            )
         )
         total_vectors += len(ids)
         manifest.completed_units.append(unit)
@@ -110,7 +98,6 @@ def embed_chunks(
         }
     )
     manifest.metadata = {
-        **upstream.metadata,
         "source_fingerprint": upstream.metadata.get("source_fingerprint"),
         "processed_fingerprint": upstream.output_fingerprint,
         "embedding_model": config.model_name,

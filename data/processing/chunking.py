@@ -160,7 +160,6 @@ def chunk_data(
         }
     )
     manifest.metadata = {
-        **upstream.metadata,
         "source_fingerprint": upstream.output_fingerprint,
         "chunk_size": config.chunk_size,
         "chunk_overlap": config.chunk_overlap,

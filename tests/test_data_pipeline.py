@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import numpy as np
@@ -28,7 +29,7 @@ from data import (
 )
 from data.artifacts import fingerprint, load_manifest, write_manifest_atomic
 from data.preprocessing.clean_data import normalize_text
-from data.processing.embed import encode_chunk_shard
+from data.processing.embed_model import encode_chunk_shard
 from tools import FaissRetriever
 
 
@@ -144,8 +145,13 @@ def test_pipeline_builds_sharded_artifacts_and_retrieves(tmp_path, fake_sources,
     assert source.stats["document_shard_count"] == 2
     assert processed.stats["chunk_count"] == 2
     assert embeddings.stats["vector_count"] == 2
+    assert {shard.kind for shard in embeddings.shards} == {"vectors"}
     assert index.stats["chunk_count"] == 2
     assert index.metadata["source_fingerprint"] == source.output_fingerprint
+    assert "dataset_name" not in processed.metadata
+    assert "chunk_size" not in embeddings.metadata
+    assert index.metadata["dataset_name"] == source.metadata["dataset_name"]
+    assert index.metadata["chunk_size"] == processed.metadata["chunk_size"]
     assert len(load_frozen_questions(tmp_path / "artifacts")) == 1
     assert validate_index(tmp_path / "artifacts").status == "complete"
 
@@ -287,4 +293,16 @@ def test_index_validation_rejects_broken_source_lineage(tmp_path, fake_sources):
     source.output_fingerprint = "different-source"
     write_manifest_atomic(layout, source)
     with pytest.raises(ValueError, match="pipeline lineage"):
+        validate_index(root)
+
+
+def test_index_validation_rejects_modified_metadata_content(tmp_path, fake_sources):
+    root = tmp_path / "artifacts"
+    run_fake_pipeline(root)
+    sqlite_path = ArtifactLayout(root).index / "chunks.sqlite3"
+    with sqlite3.connect(sqlite_path) as connection:
+        connection.execute("UPDATE chunks SET content = 'tampered' WHERE integer_id = 0")
+        connection.commit()
+
+    with pytest.raises(ValueError, match="checksum mismatch"):
         validate_index(root)

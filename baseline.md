@@ -260,11 +260,11 @@ Runtime artifacts使用以下結構：
 artifacts/
 ├── source/       # frozen document及question Parquet shards
 ├── processed/    # normalized chunk Parquet shards
-├── embeddings/   # float32 vector及int64 ID NPY shards
+├── embeddings/   # 可重用嘅float32 vector NPY shards；ID由chunk artifacts提供
 └── index/        # FAISS、SQLite及index manifest
 ```
 
-每個stage都有獨立schema v2 manifest、config hash、upstream fingerprint同shard checksums。舊schema v1 index唔可以直接沿用，必須用 `prepare all --rebuild` 重建。`eval`會輸出官方相容嘅 `answers.jsonl`，以及本地retrieval、latency、tool-call同錯誤統計。Sample artifacts只供smoke test，會標示為不可同正式benchmark比較。
+每個stage都有獨立schema v2 checkpoint manifest、config hash、upstream fingerprint同shard checksums；完整runtime metadata只喺最終index manifest組合，避免逐層複製。舊schema v1 index唔可以直接沿用，必須用 `prepare all --rebuild` 重建。`eval`會輸出官方相容嘅 `answers.jsonl`，以及本地retrieval、latency、tool-call同錯誤統計。Sample artifacts只供smoke test，會標示為不可同正式benchmark比較。
 
 ## 9. LangSmith Experiments
 
