@@ -131,7 +131,7 @@ LangSmith target只接收example inputs，並返回：
   "latency_ms": 123.4,
   "input_tokens": 100,
   "output_tokens": 20,
-  "model_name": "qwen3:8b",
+  "model_name": "hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M",
   "agent_mode": "simple",
   "error": null
 }

@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from agent import AgentMode
+from agent import DEFAULT_OLLAMA_MODEL, AgentMode
 
 
 class EvaluationConfig(BaseModel):
@@ -16,7 +16,7 @@ class EvaluationConfig(BaseModel):
     question_limit: int | None = None
     question_types: list[str] | None = None
     resume: bool = True
-    model_name: str = "qwen3:8b"
+    model_name: str = DEFAULT_OLLAMA_MODEL
 
 
 class EvaluationSummary(BaseModel):
@@ -62,7 +62,7 @@ class LangSmithExperimentConfig(BaseModel):
     artifact_root: Path = Path("artifacts")
     dataset_name: str = "EnterpriseRAG-Bench"
     agent_mode: AgentMode = "simple"
-    model_name: str = "qwen3:8b"
+    model_name: str = DEFAULT_OLLAMA_MODEL
     ollama_url: str = "http://localhost:11434"
     top_k: int = Field(default=5, ge=1, le=20)
     question_limit: int | None = Field(default=10, ge=1)

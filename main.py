@@ -15,7 +15,7 @@ from typing import Any, Iterator, Sequence
 
 from langsmith.utils import LangSmithError
 
-from agent import create_ollama_model, create_rag_agent, run_agent
+from agent import DEFAULT_OLLAMA_MODEL, create_ollama_model, create_rag_agent, run_agent
 from data import (
     ArtifactLayout,
     DownloadConfig,
@@ -45,7 +45,7 @@ from tools import FaissRetriever, create_retrieval_tool
 
 
 DEFAULT_ARTIFACT_ROOT = Path(os.getenv("RAG_ARTIFACT_ROOT", "artifacts"))
-DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
+DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_EMBEDDING = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
 DEFAULT_REVISION = os.getenv("DATASET_REVISION", "main")
@@ -183,8 +183,10 @@ def validate_ollama(base_url: str, model_name: str) -> None:
         for item in payload.get("models", [])
         if isinstance(item, dict)
     }
-    requested = model_name if ":" in model_name else f"{model_name}:latest"
-    normalized = {name if ":" in name else f"{name}:latest" for name in installed}
+    requested = (model_name if ":" in model_name else f"{model_name}:latest").casefold()
+    normalized = {
+        (name if ":" in name else f"{name}:latest").casefold() for name in installed
+    }
     if requested not in normalized:
         raise RuntimeError(f"Ollama model {model_name!r} is missing. Run: ollama pull {model_name}")
 

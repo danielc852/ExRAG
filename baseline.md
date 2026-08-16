@@ -215,13 +215,13 @@ agent:
 - `simple`：LangChain tool-calling agent
 - `deep`：Deep Agents SDK，使用 ephemeral state，唔存取 host filesystem
 
-預設使用 Ollama `qwen3:8b`，而 embedding model 為 `BAAI/bge-base-en-v1.5`。第一次運行前先安裝依賴及模型：
+預設 answer model 使用 [LiquidAI LFM2.5-2.6B](https://huggingface.co/LiquidAI/LFM2.5-2.6B)。現有 agent 經 Ollama 運行，因此實際載入官方 GGUF repository 嘅 `Q4_K_M` quantization：`hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M`。Embedding model 維持 `BAAI/bge-base-en-v1.5`。第一次運行前先安裝依賴及模型：
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-ollama pull qwen3:8b
+ollama pull hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M
 ```
 
 資料處理採用 schema v2 四階段 pipeline。建立開發用 1,000-document sample artifacts：
