@@ -265,3 +265,35 @@ artifacts/
 ```
 
 每個stage都有獨立schema v2 manifest、config hash、upstream fingerprint同shard checksums。舊schema v1 index唔可以直接沿用，必須用 `prepare all --rebuild` 重建。`eval`會輸出官方相容嘅 `answers.jsonl`，以及本地retrieval、latency、tool-call同錯誤統計。Sample artifacts只供smoke test，會標示為不可同正式benchmark比較。
+
+## 9. LangSmith Experiments
+
+LangSmith evaluation係現有本地`eval`嘅補充，會保存agent traces、deterministic retrieval feedback同simple/deep comparison。先設定cloud credentials：
+
+```bash
+export LANGSMITH_API_KEY="..."
+export LANGSMITH_TRACING=true
+```
+
+將frozen questions同步到以source fingerprint命名嘅immutable dataset snapshot：
+
+```bash
+python main.py langsmith sync \
+  --artifact-root artifacts \
+  --dataset-name EnterpriseRAG-Bench
+```
+
+分別執行兩個agent experiments：
+
+```bash
+python main.py langsmith run --agent simple --limit-questions 10
+python main.py langsmith run --agent deep --limit-questions 10
+```
+
+比較兩個完成嘅experiments：
+
+```bash
+python main.py langsmith compare SIMPLE_EXPERIMENT DEEP_EXPERIMENT
+```
+
+每次run會喺`runs/langsmith/<experiment-name>/`保存experiment metadata、官方相容`answers.jsonl`、normalized records同summary。LangSmith metrics只係deterministic local-style metrics；answer correctness、completeness同官方Invalid Extra Docs仍然要使用EnterpriseRAG-Bench官方GPT-5.4 evaluator。完整schema、私隱範圍同comparison規則見[`evaluation.md`](evaluation.md)。

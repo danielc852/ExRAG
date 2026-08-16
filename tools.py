@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,7 @@ class FaissRetriever:
         self.connection = connection
         self.embedding_model = embedding_model
         self.max_top_k = max_top_k
+        self._database_lock = threading.RLock()
 
     @classmethod
     def load(cls, artifact_root: Path) -> "FaissRetriever":
@@ -57,7 +59,10 @@ class FaissRetriever:
         layout = ArtifactLayout(artifact_root)
         manifest = validate_index(artifact_root)
         index = faiss.read_index(str(layout.index / FAISS_NAME))
-        connection = sqlite3.connect(layout.index / SQLITE_NAME)
+        connection = sqlite3.connect(
+            layout.index / SQLITE_NAME,
+            check_same_thread=False,
+        )
         connection.row_factory = sqlite3.Row
         model_name = str(manifest.metadata.get("embedding_model", ""))
         if not model_name:
@@ -87,9 +92,10 @@ class FaissRetriever:
             doc_placeholders = ",".join("?" for _ in filters.document_ids)
             clauses.append(f"doc_id IN ({doc_placeholders})")
             parameters.extend(filters.document_ids)
-        rows = self.connection.execute(
-            f"SELECT * FROM chunks WHERE {' AND '.join(clauses)}", parameters
-        ).fetchall()
+        with self._database_lock:
+            rows = self.connection.execute(
+                f"SELECT * FROM chunks WHERE {' AND '.join(clauses)}", parameters
+            ).fetchall()
         by_id = {int(row["integer_id"]): row for row in rows}
         output: list[RetrievedChunk] = []
         for integer_id in integer_ids:
@@ -149,7 +155,8 @@ class FaissRetriever:
         )
 
     def close(self) -> None:
-        self.connection.close()
+        with self._database_lock:
+            self.connection.close()
 
     def __enter__(self) -> "FaissRetriever":
         return self

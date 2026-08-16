@@ -15,4 +15,33 @@ def test_live_integration_is_opt_in():
     # visible reminder without causing network/model downloads in the unit suite.
     from main import build_parser
 
-    assert build_parser().parse_args(["index", "--limit-documents", "1"]).command == "index"
+    args = build_parser().parse_args(
+        ["prepare", "download", "--limit-documents", "1"]
+    )
+    assert args.command == "prepare"
+    assert args.prepare_stage == "download"
+
+
+@pytest.mark.skipif(
+    os.getenv("RUN_LANGSMITH_INTEGRATION") != "1",
+    reason="requires LangSmith credentials, prepared artifacts, and a running Ollama server",
+)
+def test_live_langsmith_integration_is_opt_in(tmp_path):
+    from main import main
+
+    assert main(["langsmith", "sync"]) == 0
+    assert (
+        main(
+            [
+                "langsmith",
+                "run",
+                "--limit-questions",
+                "1",
+                "--output-root",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    assert list(tmp_path.glob("*/experiment.json"))
+    assert list(tmp_path.glob("*/answers.jsonl"))

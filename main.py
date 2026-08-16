@@ -12,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Sequence
 
+from langsmith.utils import LangSmithError
+
 from agent import create_ollama_model, create_rag_agent, run_agent
 from data import (
     ArtifactLayout,
@@ -26,7 +28,15 @@ from data import (
     validate_index,
 )
 from data.artifacts import load_manifest
-from eval import EvaluationConfig, run_evaluation
+from eval import (
+    EvaluationConfig,
+    LangSmithDatasetConfig,
+    LangSmithExperimentConfig,
+    compare_experiments,
+    run_evaluation,
+    run_langsmith_experiment,
+    sync_frozen_dataset,
+)
 from tools import FaissRetriever, create_retrieval_tool
 
 
@@ -35,6 +45,7 @@ DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_EMBEDDING = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
 DEFAULT_REVISION = os.getenv("DATASET_REVISION", "main")
+DEFAULT_LANGSMITH_DATASET = os.getenv("LANGSMITH_DATASET", "EnterpriseRAG-Bench")
 
 
 def _add_artifact_argument(parser: argparse.ArgumentParser) -> None:
@@ -109,6 +120,38 @@ def build_parser() -> argparse.ArgumentParser:
     eval_parser.add_argument("--output-dir", type=Path)
     eval_parser.add_argument(
         "--resume", action=argparse.BooleanOptionalAction, default=True
+    )
+
+    langsmith_parser = commands.add_parser(
+        "langsmith", help="Sync and evaluate with LangSmith"
+    )
+    langsmith_commands = langsmith_parser.add_subparsers(
+        dest="langsmith_command", required=True
+    )
+    sync_parser = langsmith_commands.add_parser("sync", help="Sync frozen questions")
+    _add_artifact_argument(sync_parser)
+    sync_parser.add_argument("--dataset-name", default=DEFAULT_LANGSMITH_DATASET)
+
+    run_parser = langsmith_commands.add_parser("run", help="Run a cloud experiment")
+    _add_agent_arguments(run_parser)
+    run_parser.add_argument("--dataset-name", default=DEFAULT_LANGSMITH_DATASET)
+    run_scope = run_parser.add_mutually_exclusive_group()
+    run_scope.add_argument("--limit-questions", type=int, default=10)
+    run_scope.add_argument("--all-questions", action="store_true")
+    run_parser.add_argument("--question-type", action="append", dest="question_types")
+    run_parser.add_argument("--max-concurrency", type=int, default=1)
+    run_parser.add_argument("--experiment-prefix")
+    run_parser.add_argument("--output-root", type=Path, default=Path("runs/langsmith"))
+
+    compare_parser = langsmith_commands.add_parser(
+        "compare", help="Compare two deterministic experiments"
+    )
+    compare_parser.add_argument("experiment_a")
+    compare_parser.add_argument("experiment_b")
+    compare_parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=Path("runs/langsmith/comparisons"),
     )
     return parser
 
@@ -273,6 +316,80 @@ def run_eval(args: argparse.Namespace) -> int:
     return 0 if summary.failed == 0 else 1
 
 
+def create_langsmith_client():
+    from langsmith import Client
+
+    api_key = os.getenv("LANGSMITH_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError(
+            "LANGSMITH_API_KEY is required. Create a LangSmith API key and export it first."
+        )
+    endpoint = os.getenv("LANGSMITH_ENDPOINT")
+    workspace_id = os.getenv("LANGSMITH_WORKSPACE_ID")
+    return Client(
+        api_url=endpoint or None,
+        api_key=api_key,
+        workspace_id=workspace_id or None,
+    )
+
+
+def _run_langsmith_command(client, args: argparse.Namespace) -> int:
+    if args.langsmith_command == "sync":
+        result = sync_frozen_dataset(
+            client,
+            LangSmithDatasetConfig(
+                artifact_root=args.artifact_root,
+                dataset_name=args.dataset_name,
+            ),
+        )
+        print(result.model_dump_json(indent=2))
+        return 0
+    if args.langsmith_command == "compare":
+        report = compare_experiments(
+            client,
+            args.experiment_a,
+            args.experiment_b,
+            output_root=args.output_root,
+        )
+        print(report.model_dump_json(indent=2))
+        return 0
+    if args.langsmith_command == "run":
+        retriever, rag_agent = _load_agent_stack(args)
+        try:
+            result = run_langsmith_experiment(
+                client,
+                LangSmithExperimentConfig(
+                    artifact_root=args.artifact_root,
+                    dataset_name=args.dataset_name,
+                    agent_mode=args.agent,
+                    model_name=args.model,
+                    ollama_url=args.ollama_url,
+                    top_k=args.top_k,
+                    question_limit=(
+                        None if args.all_questions else args.limit_questions
+                    ),
+                    question_types=args.question_types,
+                    max_concurrency=args.max_concurrency,
+                    experiment_prefix=args.experiment_prefix,
+                    output_root=args.output_root,
+                ),
+                rag_agent,
+            )
+        finally:
+            retriever.close()
+        print(result.model_dump_json(indent=2))
+        return 0 if result.summary.failed == 0 else 1
+    raise ValueError(f"Unknown LangSmith command: {args.langsmith_command}")
+
+
+def run_langsmith(args: argparse.Namespace) -> int:
+    client = create_langsmith_client()
+    try:
+        return _run_langsmith_command(client, args)
+    finally:
+        client.close()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -283,7 +400,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return run_ask(args)
         if args.command == "eval":
             return run_eval(args)
-    except (FileNotFoundError, FileExistsError, RuntimeError, ValueError) as exc:
+        if args.command == "langsmith":
+            return run_langsmith(args)
+    except (
+        FileNotFoundError,
+        FileExistsError,
+        LangSmithError,
+        RuntimeError,
+        ValueError,
+    ) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     parser.error(f"Unknown command: {args.command}")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
@@ -22,8 +23,8 @@ class FakeIndex:
         return scores, ids
 
 
-def make_retriever():
-    connection = sqlite3.connect(":memory:")
+def make_retriever(*, thread_safe=False):
+    connection = sqlite3.connect(":memory:", check_same_thread=not thread_safe)
     connection.row_factory = sqlite3.Row
     connection.execute(
         """CREATE TABLE chunks (
@@ -80,3 +81,15 @@ def test_agent_format_contains_citation_metadata():
     assert "Document ID: d1" in formatted
     assert "Chunk ID: d1::000000" in formatted
     assert "Evidence" in formatted
+
+
+def test_metadata_reads_are_safe_across_worker_threads():
+    retriever = make_retriever(thread_safe=True)
+    try:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            results = list(
+                executor.map(lambda _index: retriever.search("query", top_k=1), range(8))
+            )
+    finally:
+        retriever.close()
+    assert [result.chunks[0].document_id for result in results] == ["d1"] * 8

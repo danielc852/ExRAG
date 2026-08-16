@@ -25,6 +25,19 @@ def test_cli_exposes_all_pipeline_stages():
         assert args.prepare_stage == stage
 
 
+def test_cli_exposes_langsmith_commands_without_breaking_local_eval():
+    parser = build_parser()
+    sync_args = parser.parse_args(["langsmith", "sync"])
+    run_args = parser.parse_args(["langsmith", "run", "--all-questions"])
+    compare_args = parser.parse_args(["langsmith", "compare", "simple", "deep"])
+    local_args = parser.parse_args(["eval", "--limit-questions", "2"])
+    assert sync_args.langsmith_command == "sync"
+    assert run_args.langsmith_command == "run"
+    assert run_args.all_questions is True
+    assert compare_args.experiment_a == "simple"
+    assert local_args.command == "eval"
+
+
 def test_old_top_level_index_command_is_removed():
     parser = build_parser()
     with pytest.raises(SystemExit):

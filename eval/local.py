@@ -8,36 +8,10 @@ from pathlib import Path
 from statistics import fmean
 from typing import Any
 
-from pydantic import BaseModel, Field
-
 from agent import AgentMode, AgentRunResult, run_agent
 from data import BenchmarkQuestion, StageManifest
 
-
-class EvaluationConfig(BaseModel):
-    agent_mode: AgentMode
-    output_dir: Path
-    question_limit: int | None = None
-    question_types: list[str] | None = None
-    resume: bool = True
-    model_name: str = "qwen3:8b"
-
-
-class EvaluationSummary(BaseModel):
-    attempted: int
-    completed: int
-    failed: int
-    mean_document_recall: float | None
-    mean_strict_extra_documents: float | None
-    mean_latency_ms: float
-    mean_tool_calls: float
-    benchmark_comparable: bool
-    note: str = Field(
-        default=(
-            "strict_extra_documents only compares against gold IDs and is not the "
-            "official LLM-judged Invalid Extra Documents metric"
-        )
-    )
+from .models import EvaluationConfig, EvaluationSummary
 
 
 def select_questions(
@@ -49,10 +23,18 @@ def select_questions(
     if limit is not None and limit < 1:
         raise ValueError("question limit must be at least 1")
     allowed = set(question_types or [])
-    selected = [question for question in questions if not allowed or question.question_type in allowed]
+    selected = [
+        question
+        for question in questions
+        if not allowed or question.question_type in allowed
+    ]
     if allowed and not selected:
-        available = ", ".join(sorted({question.question_type for question in questions}))
-        raise ValueError(f"No questions matched {sorted(allowed)}. Available types: {available}")
+        available = ", ".join(
+            sorted({question.question_type for question in questions})
+        )
+        raise ValueError(
+            f"No questions matched {sorted(allowed)}. Available types: {available}"
+        )
     return selected[:limit] if limit is not None else selected
 
 
@@ -140,7 +122,9 @@ def append_run_detail(
         {
             "question_type": question.question_type,
             "expected_document_ids": question.expected_doc_ids,
-            "document_recall": document_recall(result.document_ids, question.expected_doc_ids),
+            "document_recall": document_recall(
+                result.document_ids, question.expected_doc_ids
+            ),
             "strict_extra_documents": strict_extra_document_count(
                 result.document_ids, question.expected_doc_ids
             ),
@@ -285,7 +269,9 @@ def run_evaluation(
         completed=len(rows),
         failed=failed,
         mean_document_recall=_mean_optional(rows, "document_recall"),
-        mean_strict_extra_documents=_mean_optional(rows, "strict_extra_documents"),
+        mean_strict_extra_documents=_mean_optional(
+            rows, "strict_extra_documents"
+        ),
         mean_latency_ms=_mean_optional(rows, "latency_ms") or 0.0,
         mean_tool_calls=(
             fmean(len(row.get("tool_calls", [])) for row in rows) if rows else 0.0
