@@ -7,8 +7,8 @@ from typing import Any
 
 from .artifacts import ArtifactLayout, STAGE_ORDER, StageManifest, load_manifest
 from .models import DownloadConfig, EmbeddingConfig, IndexConfig, ProcessingConfig
-from .preprocessing import clean_data, download_dataset, review_download
-from .processing import build_faiss_index, embed_chunks
+from .preprocessing import download_dataset, review_download
+from .processing import build_faiss_index, chunk_data, embed_chunks
 
 
 PipelineConfig = DownloadConfig | ProcessingConfig | EmbeddingConfig | IndexConfig
@@ -31,7 +31,7 @@ def pre_data(
     _require_shared_root(download_config, processing_config)
     source = download_dataset(download_config, resume=resume, rebuild=rebuild)
     review_download(download_config.artifact_root)
-    processed = clean_data(processing_config, resume=resume)
+    processed = chunk_data(processing_config, resume=resume)
     return {"download": source, "process": processed}
 
 

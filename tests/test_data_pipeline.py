@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import data.preprocessing.data_cleaning as cleaning_module
 import data.preprocessing.download as download_module
+import data.processing.chunking as chunking_module
 import data.processing.process as embedding_module
 from data import (
     ArtifactLayout,
@@ -15,7 +15,7 @@ from data import (
     IndexConfig,
     ProcessingConfig,
     build_faiss_index,
-    clean_data,
+    chunk_data,
     download_dataset,
     embed_chunks,
     get_status,
@@ -96,7 +96,7 @@ def fake_sources(monkeypatch):
         lambda name, **_kwargs: documents if name == "documents" else questions,
     )
     monkeypatch.setattr(
-        cleaning_module, "create_text_splitter", lambda *_args: WholeTextSplitter()
+        chunking_module, "create_text_splitter", lambda *_args: WholeTextSplitter()
     )
     monkeypatch.setattr(
         embedding_module, "create_embedding_model", lambda *_args: FakeEmbedding()
@@ -116,7 +116,7 @@ def configs(root: Path):
 def run_fake_pipeline(root: Path):
     download, processing, embedding, index = configs(root)
     source_manifest = download_dataset(download)
-    processed_manifest = clean_data(processing)
+    processed_manifest = chunk_data(processing)
     embedding_manifest = embed_chunks(embedding)
     index_manifest = build_faiss_index(index)
     return source_manifest, processed_manifest, embedding_manifest, index_manifest
@@ -234,7 +234,7 @@ def test_process_rebuild_invalidates_downstream(tmp_path, fake_sources):
     root = tmp_path / "artifacts"
     _download, processing, _embedding, _index = configs(root)
     run_fake_pipeline(root)
-    clean_data(processing, rebuild=True)
+    chunk_data(processing, rebuild=True)
     layout = ArtifactLayout(root)
     assert layout.processed.exists()
     assert not layout.embeddings.exists()
@@ -246,7 +246,7 @@ def test_process_rebuild_invalidates_downstream(tmp_path, fake_sources):
 
 def test_missing_upstream_is_rejected(tmp_path):
     with pytest.raises(FileNotFoundError, match="prepare download"):
-        clean_data(ProcessingConfig(artifact_root=tmp_path / "artifacts"))
+        chunk_data(ProcessingConfig(artifact_root=tmp_path / "artifacts"))
 
 
 def test_schema_v1_and_unsafe_artifact_roots_are_rejected(tmp_path):

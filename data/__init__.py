@@ -12,8 +12,6 @@ from .models import (
 )
 from .pipeline import get_status, pre_data, pre_store, run_process
 from .preprocessing import (
-    clean_data,
-    chunk_document,
     download_dataset,
     load_frozen_questions,
     normalize_text,
@@ -21,6 +19,8 @@ from .preprocessing import (
 )
 from .processing import (
     build_faiss_index,
+    chunk_data,
+    chunk_document,
     embed_chunks,
     load_index_manifest,
     validate_index,
@@ -38,7 +38,7 @@ __all__ = [
     "ShardInfo",
     "StageManifest",
     "build_faiss_index",
-    "clean_data",
+    "chunk_data",
     "chunk_document",
     "download_dataset",
     "embed_chunks",

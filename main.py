@@ -23,7 +23,7 @@ from data import (
     IndexConfig,
     ProcessingConfig,
     build_faiss_index,
-    clean_data,
+    chunk_data,
     download_dataset,
     embed_chunks,
     get_status,
@@ -232,7 +232,7 @@ def run_prepare(args: argparse.Namespace) -> int:
         return 0
     stages = {
         "download": (download_dataset, _download_config),
-        "process": (clean_data, _processing_config),
+        "process": (chunk_data, _processing_config),
         "embed": (embed_chunks, _embedding_config),
         "index": (build_faiss_index, _index_config),
     }
