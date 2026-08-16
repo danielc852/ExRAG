@@ -6,7 +6,19 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pytest
 
-from tools import FaissRetriever, RetrievalFilters, RetrievalResult, RetrievedChunk, format_chunks_for_agent
+from pydantic import ValidationError
+
+from tools import (
+    FaissRetriever,
+    RetrievalFilters,
+    RetrievalResult,
+    RetrieveDocumentsInput,
+    RetrieveDocumentsOutput,
+    RetrievedChunk,
+    create_retrieval_tool,
+    format_chunks_for_agent,
+    load_tool_description,
+)
 
 
 class FakeEmbedding:
@@ -93,3 +105,27 @@ def test_metadata_reads_are_safe_across_worker_threads():
     finally:
         retriever.close()
     assert [result.chunks[0].document_id for result in results] == ["d1"] * 8
+
+
+def test_tool_schema_defines_input_and_output_contracts():
+    tool_input = RetrieveDocumentsInput(query="benefits policy")
+    assert tool_input.top_k == 5
+    assert RetrieveDocumentsOutput.model_validate(
+        {"query": "benefits policy", "chunks": [], "latency_ms": 1.5}
+    ).chunks == []
+    with pytest.raises(ValidationError):
+        RetrieveDocumentsInput(query="benefits policy", top_k=21)
+
+
+def test_tool_uses_markdown_description_and_configured_schema():
+    retriever = make_retriever()
+    try:
+        retrieval_tool = create_retrieval_tool(
+            retriever, default_top_k=2, max_top_k=3
+        )
+        assert retrieval_tool.description == load_tool_description()
+        schema = retrieval_tool.args_schema.model_json_schema()
+        assert schema["properties"]["top_k"]["default"] == 2
+        assert schema["properties"]["top_k"]["maximum"] == 3
+    finally:
+        retriever.close()

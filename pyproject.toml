@@ -26,7 +26,14 @@ dependencies = [
 dev = ["pytest>=8.0", "pytest-cov>=5.0"]
 
 [tool.hatch.build.targets.wheel]
-include = ["agent.py", "main.py", "tools.py", "data/**/*.py", "eval/**/*.py"]
+include = [
+  "agent.py",
+  "main.py",
+  "tools/**/*.py",
+  "tools/**/*.md",
+  "data/**/*.py",
+  "eval/**/*.py",
+]
 
 [tool.pytest.ini_options]
 addopts = "-q"

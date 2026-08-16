@@ -1,4 +1,4 @@
-"""Retrieval implementation and LangChain tool adapter."""
+"""Core implementation and LangChain adapter for document retrieval."""
 
 from __future__ import annotations
 
@@ -8,30 +8,22 @@ import time
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
-
 from data.artifacts import ArtifactLayout
 from data.indexing import FAISS_NAME, SQLITE_NAME, validate_index
+from tools.retrieve_documents.schema import (
+    RetrievalFilters,
+    RetrievalResult,
+    RetrievedChunk,
+    create_input_schema,
+)
 
 
-class RetrievalFilters(BaseModel):
-    source_types: list[str] | None = None
-    document_ids: list[str] | None = None
+DESCRIPTION_PATH = Path(__file__).with_name("retrieve_documents.md")
 
 
-class RetrievedChunk(BaseModel):
-    chunk_id: str
-    document_id: str
-    source_type: str
-    title: str
-    content: str
-    similarity_score: float
-
-
-class RetrievalResult(BaseModel):
-    query: str
-    chunks: list[RetrievedChunk]
-    latency_ms: float
+def load_tool_description() -> str:
+    """Load the agent-facing tool instructions kept beside the implementation."""
+    return DESCRIPTION_PATH.read_text(encoding="utf-8").strip()
 
 
 class FaissRetriever:
@@ -196,19 +188,23 @@ def create_retrieval_tool(
     if default_top_k < 1 or default_top_k > max_top_k:
         raise ValueError("default_top_k must be within the allowed top-k range")
     retriever.max_top_k = max_top_k
+    input_schema = create_input_schema(
+        default_top_k=default_top_k,
+        max_top_k=max_top_k,
+    )
 
-    @tool("retrieve_documents", response_format="content_and_artifact")
+    @tool(
+        "retrieve_documents",
+        args_schema=input_schema,
+        description=load_tool_description(),
+        response_format="content_and_artifact",
+    )
     def retrieve_documents(
         query: str,
-        top_k: int = Field(default=default_top_k, ge=1, le=max_top_k),
+        top_k: int = default_top_k,
         source_types: list[str] | None = None,
         document_ids: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
-        """Search enterprise documents for evidence relevant to a question.
-
-        Use source_types or document_ids only when the user explicitly supplies those
-        constraints. Never invent filters.
-        """
         filters = RetrievalFilters(source_types=source_types, document_ids=document_ids)
         result = retriever.search(query, top_k=top_k, filters=filters)
         return format_chunks_for_agent(result), result.model_dump()
