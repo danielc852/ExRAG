@@ -1,4 +1,4 @@
-"""Stable public API for the EnterpriseRAG data preparation pipeline."""
+"""Stable public API for the ExRAG data preparation pipeline."""
 
 from .artifacts import ArtifactLayout, ShardInfo, StageManifest
 from .models import (

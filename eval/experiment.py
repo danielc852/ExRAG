@@ -128,7 +128,7 @@ def run_langsmith_experiment(
         question_ids=question_ids,
     )
     prefix = config.experiment_prefix or (
-        f"enterprise-rag-{config.agent_mode}-{safe_name(config.model_name, 'model')}"
+        f"exrag-{config.agent_mode}-{safe_name(config.model_name, 'model')}"
     )
     result = client.evaluate(
         build_langsmith_target(agent, config),

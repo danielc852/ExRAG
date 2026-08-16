@@ -1,4 +1,4 @@
-# EnterpriseRAG Progress and Version Plan
+# ExRAG Progress and Version Plan
 
 > 呢份文件係 `baseline.md` 嘅執行版：`baseline.md` 定義目標同固定規則；本文件追蹤目前狀態、下一步、每輪實驗，以及可視化輸出。
 

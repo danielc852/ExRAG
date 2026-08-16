@@ -1,4 +1,4 @@
-"""Factories for the simple and deep Enterprise RAG agents."""
+"""Factories for the simple and deep ExRAG agents."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def create_simple_agent(model, retrieval_tool):
                 tool_name="retrieve_documents", run_limit=3, exit_behavior="continue"
             )
         ],
-        name="enterprise_rag_simple",
+        name="exrag_simple",
     )
 
 

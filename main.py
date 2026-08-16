@@ -1,4 +1,4 @@
-"""Command-line entry point for the EnterpriseRAG-Bench baseline."""
+"""Command-line entry point for ExRAG."""
 
 from __future__ import annotations
 

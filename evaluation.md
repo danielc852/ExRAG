@@ -1,4 +1,4 @@
-# EnterpriseRAG LangSmith Evaluation Suite
+# ExRAG LangSmith Evaluation Suite
 
 ## 1. Purpose
 

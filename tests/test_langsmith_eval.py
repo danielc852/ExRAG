@@ -210,7 +210,7 @@ def test_langsmith_target_returns_structured_agent_result(monkeypatch):
 class FakeExperimentResults:
     def __init__(self, rows):
         self.rows = rows
-        self.experiment_name = "enterprise-rag-simple-test-1234"
+        self.experiment_name = "exrag-simple-test-1234"
         self.experiment_id = uuid4()
         self.url = "https://smith.example/experiment"
 

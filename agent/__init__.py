@@ -1,4 +1,4 @@
-"""Public API for constructing and running Enterprise RAG agents."""
+"""Public API for constructing and running ExRAG agents."""
 
 from agent.agent import (
     SYSTEM_PROMPT,

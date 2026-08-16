@@ -1,4 +1,4 @@
-"""Synchronize frozen EnterpriseRAG questions to immutable LangSmith datasets."""
+"""Synchronize frozen EnterpriseRAG-Bench questions to LangSmith datasets."""
 
 from __future__ import annotations
 

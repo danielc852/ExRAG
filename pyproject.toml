@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "enterprise-rag-baseline"
+name = "exrag"
 version = "0.1.0"
-description = "A reproducible LangChain and Deep Agents baseline for EnterpriseRAG-Bench"
+description = "ExRAG: a reproducible LangChain and Deep Agents baseline for EnterpriseRAG-Bench"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "datasets>=3.0",

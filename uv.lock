@@ -734,7 +734,7 @@ wheels = [
 ]
 
 [[package]]
-name = "enterprise-rag-baseline"
+name = "exrag"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

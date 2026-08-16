@@ -1,4 +1,4 @@
-"""Tool registry exposed to Enterprise RAG agents."""
+"""Tool registry exposed to ExRAG agents."""
 
 from __future__ import annotations
 

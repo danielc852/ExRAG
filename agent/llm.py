@@ -1,4 +1,4 @@
-"""Language model construction for Enterprise RAG agents."""
+"""Language model construction for ExRAG agents."""
 
 from __future__ import annotations
 

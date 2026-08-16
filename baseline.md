@@ -1,4 +1,4 @@
-# EnterpriseRAG-Bench Baseline
+# ExRAG Baseline
 
 ## 1. 目標
 

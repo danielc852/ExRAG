@@ -1,4 +1,4 @@
-"""Deterministic LangSmith evaluators for EnterpriseRAG experiments."""
+"""Deterministic LangSmith evaluators for ExRAG experiments."""
 
 from __future__ import annotations
 
