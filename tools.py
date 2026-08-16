@@ -9,7 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from dataset import FAISS_NAME, SQLITE_NAME, load_manifest, validate_index
+from data.artifacts import ArtifactLayout
+from data.indexing import FAISS_NAME, SQLITE_NAME, validate_index
 
 
 class RetrievalFilters(BaseModel):
@@ -49,16 +50,22 @@ class FaissRetriever:
         self.max_top_k = max_top_k
 
     @classmethod
-    def load(cls, index_dir: Path) -> "FaissRetriever":
+    def load(cls, artifact_root: Path) -> "FaissRetriever":
         import faiss
         from sentence_transformers import SentenceTransformer
 
-        index_dir = Path(index_dir)
-        manifest = validate_index(index_dir)
-        index = faiss.read_index(str(index_dir / FAISS_NAME))
-        connection = sqlite3.connect(index_dir / SQLITE_NAME)
+        layout = ArtifactLayout(artifact_root)
+        manifest = validate_index(artifact_root)
+        index = faiss.read_index(str(layout.index / FAISS_NAME))
+        connection = sqlite3.connect(layout.index / SQLITE_NAME)
         connection.row_factory = sqlite3.Row
-        embedding_model = SentenceTransformer(manifest.embedding_model)
+        model_name = str(manifest.metadata.get("embedding_model", ""))
+        if not model_name:
+            connection.close()
+            raise ValueError("Index manifest does not identify its embedding model")
+        revision = manifest.metadata.get("embedding_revision")
+        kwargs = {"revision": revision} if revision else {}
+        embedding_model = SentenceTransformer(model_name, **kwargs)
         return cls(index=index, connection=connection, embedding_model=embedding_model)
 
     def _matching_rows(

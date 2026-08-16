@@ -13,60 +13,109 @@ from pathlib import Path
 from typing import Sequence
 
 from agent import create_ollama_model, create_rag_agent, run_agent
-from dataset import IndexBuildConfig, build_index, load_questions, validate_index
+from data import (
+    ArtifactLayout,
+    DownloadConfig,
+    EmbeddingConfig,
+    IndexConfig,
+    ProcessingConfig,
+    get_pipeline_status,
+    load_frozen_questions,
+    run_all,
+    run_stage,
+    validate_index,
+)
+from data.artifacts import load_manifest
 from eval import EvaluationConfig, run_evaluation
 from tools import FaissRetriever, create_retrieval_tool
 
 
-DEFAULT_INDEX_DIR = Path(os.getenv("RAG_INDEX_DIR", "data/index"))
+DEFAULT_ARTIFACT_ROOT = Path(os.getenv("RAG_ARTIFACT_ROOT", "artifacts"))
 DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_EMBEDDING = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
 DEFAULT_REVISION = os.getenv("DATASET_REVISION", "main")
 
 
+def _add_artifact_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--artifact-root", type=Path, default=DEFAULT_ARTIFACT_ROOT)
+
+
+def _add_lifecycle_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--resume", action=argparse.BooleanOptionalAction, default=True
+    )
+    parser.add_argument("--rebuild", action="store_true")
+
+
+def _add_download_arguments(parser: argparse.ArgumentParser) -> None:
+    corpus = parser.add_mutually_exclusive_group()
+    corpus.add_argument("--full", action="store_true")
+    corpus.add_argument("--limit-documents", type=int, default=1_000)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--shard-size", type=int, default=1_000)
+    parser.add_argument("--dataset-revision", default=DEFAULT_REVISION)
+    parser.add_argument("--cache-dir", type=Path)
+
+
+def _add_processing_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--chunk-size", type=int, default=512)
+    parser.add_argument("--chunk-overlap", type=int, default=64)
+    parser.add_argument("--tokenizer-model", default=DEFAULT_EMBEDDING)
+
+
+def _add_embedding_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING)
+    parser.add_argument("--embedding-revision")
+    parser.add_argument("--embedding-batch-size", type=int, default=32)
+
+
+def _add_index_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--index-batch-size", type=int, default=10_000)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    subcommands = parser.add_subparsers(dest="command", required=True)
+    commands = parser.add_subparsers(dest="command", required=True)
 
-    index_parser = subcommands.add_parser("index", help="Download, chunk, and index documents")
-    index_parser.add_argument("--index-dir", type=Path, default=DEFAULT_INDEX_DIR)
-    corpus = index_parser.add_mutually_exclusive_group()
-    corpus.add_argument("--full", action="store_true", help="Index the full benchmark corpus")
-    corpus.add_argument("--limit-documents", type=int, default=1_000)
-    lifecycle = index_parser.add_mutually_exclusive_group()
-    lifecycle.add_argument("--resume", action="store_true")
-    lifecycle.add_argument("--rebuild", action="store_true")
-    index_parser.add_argument("--seed", type=int, default=42)
-    index_parser.add_argument("--chunk-size", type=int, default=512)
-    index_parser.add_argument("--chunk-overlap", type=int, default=64)
-    index_parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING)
-    index_parser.add_argument("--embedding-batch-size", type=int, default=32)
-    index_parser.add_argument("--checkpoint-every", type=int, default=1_000)
-    index_parser.add_argument("--dataset-revision", default=DEFAULT_REVISION)
-    index_parser.add_argument("--cache-dir", type=Path)
+    prepare = commands.add_parser("prepare", help="Run data preparation stages")
+    stages = prepare.add_subparsers(dest="prepare_stage", required=True)
+    for stage in ("download", "process", "embed", "index", "all"):
+        stage_parser = stages.add_parser(stage)
+        _add_artifact_argument(stage_parser)
+        _add_lifecycle_arguments(stage_parser)
+        if stage in {"download", "all"}:
+            _add_download_arguments(stage_parser)
+        if stage in {"process", "all"}:
+            _add_processing_arguments(stage_parser)
+        if stage in {"embed", "all"}:
+            _add_embedding_arguments(stage_parser)
+        if stage in {"index", "all"}:
+            _add_index_arguments(stage_parser)
+    status_parser = stages.add_parser("status")
+    _add_artifact_argument(status_parser)
 
-    ask_parser = subcommands.add_parser("ask", help="Ask one question")
+    ask_parser = commands.add_parser("ask", help="Ask one question")
     ask_parser.add_argument("question")
     _add_agent_arguments(ask_parser)
     ask_parser.add_argument("--json", action="store_true", dest="as_json")
 
-    eval_parser = subcommands.add_parser("eval", help="Run resumable benchmark questions")
+    eval_parser = commands.add_parser("eval", help="Run resumable benchmark questions")
     _add_agent_arguments(eval_parser)
     eval_scope = eval_parser.add_mutually_exclusive_group()
     eval_scope.add_argument("--limit-questions", type=int, default=10)
     eval_scope.add_argument("--all-questions", action="store_true")
     eval_parser.add_argument("--question-type", action="append", dest="question_types")
     eval_parser.add_argument("--output-dir", type=Path)
-    eval_parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
-    eval_parser.add_argument("--dataset-revision", default=DEFAULT_REVISION)
-    eval_parser.add_argument("--cache-dir", type=Path)
+    eval_parser.add_argument(
+        "--resume", action=argparse.BooleanOptionalAction, default=True
+    )
     return parser
 
 
 def _add_agent_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--agent", choices=("simple", "deep"), default="simple")
-    parser.add_argument("--index-dir", type=Path, default=DEFAULT_INDEX_DIR)
+    _add_artifact_argument(parser)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--ollama-url", default=DEFAULT_OLLAMA_URL)
@@ -87,33 +136,85 @@ def validate_ollama(base_url: str, model_name: str) -> None:
         if isinstance(item, dict)
     }
     requested = model_name if ":" in model_name else f"{model_name}:latest"
-    normalized_installed = {name if ":" in name else f"{name}:latest" for name in installed}
-    if requested not in normalized_installed:
+    normalized = {name if ":" in name else f"{name}:latest" for name in installed}
+    if requested not in normalized:
         raise RuntimeError(f"Ollama model {model_name!r} is missing. Run: ollama pull {model_name}")
 
 
-def run_index(args: argparse.Namespace) -> int:
-    config = IndexBuildConfig(
-        index_dir=args.index_dir,
+def _download_config(args: argparse.Namespace) -> DownloadConfig:
+    return DownloadConfig(
+        artifact_root=args.artifact_root,
         dataset_revision=args.dataset_revision,
         full_corpus=args.full,
-        document_limit=args.limit_documents,
+        document_limit=None if args.full else args.limit_documents,
         seed=args.seed,
-        chunk_size=args.chunk_size,
-        chunk_overlap=args.chunk_overlap,
-        embedding_model=args.embedding_model,
-        embedding_batch_size=args.embedding_batch_size,
-        checkpoint_every=args.checkpoint_every,
+        shard_size=args.shard_size,
         cache_dir=args.cache_dir,
     )
-    manifest = build_index(config, rebuild=args.rebuild, resume=args.resume)
-    print(json.dumps(manifest.__dict__, indent=2, sort_keys=True))
+
+
+def _processing_config(args: argparse.Namespace) -> ProcessingConfig:
+    return ProcessingConfig(
+        artifact_root=args.artifact_root,
+        chunk_size=args.chunk_size,
+        chunk_overlap=args.chunk_overlap,
+        tokenizer_model=args.tokenizer_model,
+    )
+
+
+def _embedding_config(args: argparse.Namespace) -> EmbeddingConfig:
+    return EmbeddingConfig(
+        artifact_root=args.artifact_root,
+        model_name=args.embedding_model,
+        model_revision=args.embedding_revision,
+        batch_size=args.embedding_batch_size,
+    )
+
+
+def _index_config(args: argparse.Namespace) -> IndexConfig:
+    return IndexConfig(
+        artifact_root=args.artifact_root,
+        batch_size=args.index_batch_size,
+    )
+
+
+def run_prepare(args: argparse.Namespace) -> int:
+    if args.prepare_stage == "status":
+        print(json.dumps(get_pipeline_status(args.artifact_root), indent=2, sort_keys=True))
+        return 0
+    config_factories = {
+        "download": _download_config,
+        "process": _processing_config,
+        "embed": _embedding_config,
+        "index": _index_config,
+    }
+    if args.prepare_stage == "all":
+        manifests = run_all(
+            _download_config(args),
+            _processing_config(args),
+            _embedding_config(args),
+            _index_config(args),
+            resume=args.resume,
+            rebuild=args.rebuild,
+        )
+        payload = {
+            stage: manifest.model_dump(mode="json") for stage, manifest in manifests.items()
+        }
+    else:
+        manifest = run_stage(
+            args.prepare_stage,
+            config_factories[args.prepare_stage](args),
+            resume=args.resume,
+            rebuild=args.rebuild,
+        )
+        payload = manifest.model_dump(mode="json")
+    print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
 
 def _load_agent_stack(args: argparse.Namespace):
     validate_ollama(args.ollama_url, args.model)
-    retriever = FaissRetriever.load(args.index_dir)
+    retriever = FaissRetriever.load(args.artifact_root)
     retrieval_tool = create_retrieval_tool(retriever, default_top_k=args.top_k)
     model = create_ollama_model(args.model, args.ollama_url)
     rag_agent = create_rag_agent(args.agent, model, retrieval_tool)
@@ -145,18 +246,16 @@ def _evaluation_output_dir(args: argparse.Namespace) -> Path:
         matches = sorted(runs_dir.glob(f"*-{args.agent}"))
         if matches:
             return matches[-1]
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return runs_dir / f"{timestamp}-{args.agent}"
+    return runs_dir / f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.agent}"
 
 
 def run_eval(args: argparse.Namespace) -> int:
-    manifest = validate_index(args.index_dir)
-    if args.dataset_revision != manifest.dataset_revision:
-        raise ValueError(
-            "Question dataset revision does not match the index revision "
-            f"({args.dataset_revision!r} != {manifest.dataset_revision!r})"
-        )
-    questions = load_questions(args.dataset_revision, args.cache_dir)
+    manifest = validate_index(args.artifact_root)
+    layout = ArtifactLayout(args.artifact_root)
+    source = load_manifest(layout, "download")
+    if manifest.metadata.get("source_fingerprint") != source.output_fingerprint:
+        raise ValueError("Index and frozen question artifacts do not share the same source lineage")
+    questions = load_frozen_questions(args.artifact_root)
     retriever, rag_agent = _load_agent_stack(args)
     try:
         config = EvaluationConfig(
@@ -178,8 +277,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "index":
-            return run_index(args)
+        if args.command == "prepare":
+            return run_prepare(args)
         if args.command == "ask":
             return run_ask(args)
         if args.command == "eval":

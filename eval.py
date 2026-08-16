@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import fmean
@@ -12,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agent import AgentMode, AgentRunResult, run_agent
-from dataset import BenchmarkQuestion, IndexManifest
+from data import BenchmarkQuestion, StageManifest
 
 
 class EvaluationConfig(BaseModel):
@@ -164,14 +163,14 @@ def _mean_optional(rows: list[dict[str, Any]], field: str) -> float | None:
 
 def _write_run_config(
     config: EvaluationConfig,
-    manifest: IndexManifest,
+    manifest: StageManifest,
     selected_count: int,
 ) -> None:
     payload = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "evaluation": config.model_dump(mode="json"),
         "selected_question_count": selected_count,
-        "index": asdict(manifest),
+        "index": manifest.model_dump(mode="json"),
     }
     path = config.output_dir / "config.json"
     if config.resume and path.exists():
@@ -194,17 +193,20 @@ def _write_run_config(
                 selected_count,
             ),
             "dataset fingerprint": (
-                existing_index.get("dataset_fingerprint"),
-                manifest.dataset_fingerprint,
+                existing_index.get("metadata", {}).get("documents_fingerprint"),
+                manifest.metadata.get("documents_fingerprint"),
             ),
             "embedding model": (
-                existing_index.get("embedding_model"),
-                manifest.embedding_model,
+                existing_index.get("metadata", {}).get("embedding_model"),
+                manifest.metadata.get("embedding_model"),
             ),
-            "chunk size": (existing_index.get("chunk_size"), manifest.chunk_size),
+            "chunk size": (
+                existing_index.get("metadata", {}).get("chunk_size"),
+                manifest.metadata.get("chunk_size"),
+            ),
             "chunk overlap": (
-                existing_index.get("chunk_overlap"),
-                manifest.chunk_overlap,
+                existing_index.get("metadata", {}).get("chunk_overlap"),
+                manifest.metadata.get("chunk_overlap"),
             ),
         }
         mismatches = [name for name, values in checks.items() if values[0] != values[1]]
@@ -221,7 +223,7 @@ def run_evaluation(
     config: EvaluationConfig,
     agent,
     questions: list[BenchmarkQuestion],
-    manifest: IndexManifest,
+    manifest: StageManifest,
 ) -> EvaluationSummary:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     answers_path = config.output_dir / "answers.jsonl"
@@ -272,7 +274,7 @@ def run_evaluation(
     }
     rows = [latest_by_id[key] for key in sorted(latest_by_id)]
     benchmark_comparable = (
-        manifest.corpus_mode == "full"
+        manifest.metadata.get("corpus_mode") == "full"
         and config.question_limit is None
         and not config.question_types
         and len(rows) == len(questions)

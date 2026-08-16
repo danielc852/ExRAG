@@ -224,25 +224,44 @@ pip install -e '.[dev]'
 ollama pull qwen3:8b
 ```
 
-建立開發用 1,000-document sample index：
+資料處理採用 schema v2 四階段 pipeline。建立開發用 1,000-document sample artifacts：
 
 ```bash
-python main.py index
+python main.py prepare download
+python main.py prepare process
+python main.py prepare embed
+python main.py prepare index
 ```
 
-正式 benchmark 必須建立完整 corpus index：
+亦可以用單一命令完成全部階段：
 
 ```bash
-python main.py index --full --rebuild
+python main.py prepare all
+```
+
+正式 benchmark 必須重新建立完整 corpus artifacts：
+
+```bash
+python main.py prepare all --full --rebuild
 ```
 
 單題問答及批量 evaluation：
 
 ```bash
-python main.py ask "What is the relevant policy?" --agent simple
-python main.py ask "What is the relevant policy?" --agent deep
-python main.py eval --agent simple
-python main.py eval --agent deep --all-questions
+python main.py ask "What is the relevant policy?" --agent simple --artifact-root artifacts
+python main.py ask "What is the relevant policy?" --agent deep --artifact-root artifacts
+python main.py eval --agent simple --artifact-root artifacts
+python main.py eval --agent deep --all-questions --artifact-root artifacts
 ```
 
-`eval` 會輸出官方相容嘅 `answers.jsonl`，以及本地 retrieval、latency、tool-call 同錯誤統計。Sample index 嘅結果只供 smoke test，會標示為不可同正式 benchmark 比較。
+Runtime artifacts使用以下結構：
+
+```text
+artifacts/
+├── source/       # frozen document及question Parquet shards
+├── processed/    # normalized chunk Parquet shards
+├── embeddings/   # float32 vector及int64 ID NPY shards
+└── index/        # FAISS、SQLite及index manifest
+```
+
+每個stage都有獨立schema v2 manifest、config hash、upstream fingerprint同shard checksums。舊schema v1 index唔可以直接沿用，必須用 `prepare all --rebuild` 重建。`eval`會輸出官方相容嘅 `answers.jsonl`，以及本地retrieval、latency、tool-call同錯誤統計。Sample artifacts只供smoke test，會標示為不可同正式benchmark比較。

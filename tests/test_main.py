@@ -2,21 +2,35 @@ from __future__ import annotations
 
 import pytest
 
-from main import build_parser
+from main import _download_config, build_parser
 
 
 def test_cli_defaults_to_safe_sample_and_ten_questions():
     parser = build_parser()
-    index_args = parser.parse_args(["index"])
-    assert index_args.limit_documents == 1_000
-    assert index_args.full is False
+    download_args = parser.parse_args(["prepare", "download"])
+    assert download_args.limit_documents == 1_000
+    assert download_args.full is False
+    assert str(download_args.artifact_root) == "artifacts"
 
     eval_args = parser.parse_args(["eval"])
     assert eval_args.limit_questions == 10
     assert eval_args.agent == "simple"
+    assert str(eval_args.artifact_root) == "artifacts"
 
 
-def test_cli_rejects_conflicting_index_lifecycle_flags():
+def test_cli_exposes_all_pipeline_stages():
+    parser = build_parser()
+    for stage in ("download", "process", "embed", "index", "all", "status"):
+        args = parser.parse_args(["prepare", stage])
+        assert args.prepare_stage == stage
+
+
+def test_old_top_level_index_command_is_removed():
     parser = build_parser()
     with pytest.raises(SystemExit):
-        parser.parse_args(["index", "--resume", "--rebuild"])
+        parser.parse_args(["index"])
+
+
+def test_full_download_config_does_not_record_sample_limit():
+    args = build_parser().parse_args(["prepare", "download", "--full"])
+    assert _download_config(args).document_limit is None

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from agent import AgentRunResult
-from dataset import BenchmarkQuestion, IndexManifest
+from data import BenchmarkQuestion, StageManifest
 from eval import (
     EvaluationConfig,
     run_evaluation,
@@ -66,22 +66,27 @@ def test_completed_ids_ignore_truncated_jsonl(tmp_path: Path):
     assert load_completed_question_ids(path) == {"q1"}
 
 
-def test_resume_rejects_changed_model(tmp_path: Path):
-    manifest = IndexManifest(
-        schema_version=1,
+def index_manifest():
+    return StageManifest(
+        stage="index",
         status="complete",
-        dataset_revision="main",
-        dataset_fingerprint="fingerprint",
-        corpus_mode="sample",
-        document_limit=1,
-        processed_documents=1,
-        chunk_count=1,
-        embedding_model="embed",
-        embedding_dimension=2,
-        chunk_size=512,
-        chunk_overlap=64,
-        seed=42,
+        config={"batch_size": 10},
+        config_hash="config",
+        upstream_fingerprint="embed",
+        output_fingerprint="index",
+        stats={"chunk_count": 1},
+        metadata={
+            "documents_fingerprint": "fingerprint",
+            "corpus_mode": "sample",
+            "embedding_model": "embed",
+            "chunk_size": 512,
+            "chunk_overlap": 64,
+        },
     )
+
+
+def test_resume_rejects_changed_model(tmp_path: Path):
+    manifest = index_manifest()
     first = EvaluationConfig(agent_mode="simple", output_dir=tmp_path, model_name="first")
     _write_run_config(first, manifest, 1)
     changed = EvaluationConfig(agent_mode="simple", output_dir=tmp_path, model_name="second")
@@ -108,21 +113,7 @@ def test_evaluation_resumes_completed_answers(tmp_path: Path):
                 ]
             }
 
-    manifest = IndexManifest(
-        schema_version=1,
-        status="complete",
-        dataset_revision="main",
-        dataset_fingerprint="fingerprint",
-        corpus_mode="sample",
-        document_limit=1,
-        processed_documents=1,
-        chunk_count=1,
-        embedding_model="embed",
-        embedding_dimension=2,
-        chunk_size=512,
-        chunk_overlap=64,
-        seed=42,
-    )
+    manifest = index_manifest()
     config = EvaluationConfig(
         agent_mode="simple", output_dir=tmp_path, question_limit=1, model_name="model"
     )
