@@ -5,32 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from agent.helpers import _artifact_payload, _message_content
 from agent.state import AgentMode, AgentRunResult, ToolCallTrace
-
-
-def _message_content(message: Any) -> str:
-    content = getattr(message, "content", "")
-    if isinstance(content, str):
-        return content.strip()
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, str):
-                parts.append(block)
-            elif isinstance(block, dict) and block.get("type") in {"text", "output_text"}:
-                parts.append(str(block.get("text", "")))
-        return "\n".join(part for part in parts if part).strip()
-    return str(content).strip() if content is not None else ""
-
-
-def _artifact_payload(artifact: Any) -> dict[str, Any] | None:
-    if artifact is None:
-        return None
-    if isinstance(artifact, dict):
-        return artifact
-    if hasattr(artifact, "model_dump"):
-        return artifact.model_dump()
-    return None
 
 
 def agent_result(
