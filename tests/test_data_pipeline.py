@@ -251,7 +251,7 @@ def test_process_rebuild_invalidates_downstream(tmp_path, fake_sources):
 
 
 def test_missing_upstream_is_rejected(tmp_path):
-    with pytest.raises(FileNotFoundError, match="prepare download"):
+    with pytest.raises(FileNotFoundError, match="main.py download"):
         chunk_data(ProcessingConfig(artifact_root=tmp_path / "artifacts"))
 
 

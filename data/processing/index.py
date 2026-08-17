@@ -39,7 +39,9 @@ def validate_index(artifact_root: Path | str) -> StageManifest:
     layout = ArtifactLayout(artifact_root)
     manifest = load_manifest(layout, "index")
     if manifest.status != "complete":
-        raise ValueError("Index stage is incomplete; run `python main.py prepare index`")
+        raise ValueError(
+            "Index stage is incomplete; run `python main.py init_vectordb sample|full`"
+        )
     verify_manifest_files(layout, manifest)
     source = load_manifest(layout, "download")
     processed = load_manifest(layout, "process")
@@ -91,7 +93,8 @@ def build_faiss_index(
     processed = load_manifest(layout, "process")
     if processed.status != "complete":
         raise ValueError(
-            "Processed artifacts are incomplete; run `python main.py prepare process`"
+            "Processed artifacts are incomplete; "
+            "run `python main.py init_vectordb sample|full`"
         )
     verify_manifest_files(layout, processed)
     if upstream.upstream_fingerprint != processed.output_fingerprint:

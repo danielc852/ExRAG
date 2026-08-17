@@ -2,21 +2,67 @@ from __future__ import annotations
 
 import pytest
 
-from main import DEFAULT_MODEL, _download_config, build_parser, validate_ollama
+from main import (
+    DEFAULT_MODEL,
+    SAMPLE_DOCUMENT_LIMIT,
+    _artifact_root,
+    _download_config,
+    build_parser,
+    validate_ollama,
+)
 
 
-def test_cli_defaults_to_safe_sample_and_ten_questions():
+def test_cli_exposes_only_the_three_experiment_pipelines():
     parser = build_parser()
-    download_args = parser.parse_args(["prepare", "download"])
-    assert download_args.limit_documents == 1_000
-    assert download_args.full is False
-    assert str(download_args.artifact_root) == "artifacts"
 
-    eval_args = parser.parse_args(["eval"])
-    assert eval_args.limit_questions == 10
-    assert eval_args.agent == "simple"
-    assert eval_args.model == "hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M"
-    assert str(eval_args.artifact_root) == "artifacts"
+    assert parser.parse_args(["download", "sample"]).command == "download"
+    assert (
+        parser.parse_args(["init_vectordb", "sample"]).command
+        == "init_vectordb"
+    )
+    assert parser.parse_args(["run_exper", "sample"]).command == "run_exper"
+
+    for removed_command in ("prepare", "ask", "eval", "langsmith"):
+        with pytest.raises(SystemExit):
+            parser.parse_args([removed_command])
+
+
+def test_sample_and_full_modes_use_separate_default_artifacts():
+    parser = build_parser()
+    sample = parser.parse_args(["download", "sample"])
+    full = parser.parse_args(["download", "full"])
+
+    assert _artifact_root(sample).as_posix() == "artifacts/sample"
+    assert _artifact_root(full).as_posix() == "artifacts/full"
+    assert _download_config(sample).document_limit == SAMPLE_DOCUMENT_LIMIT
+    assert _download_config(sample).full_corpus is False
+    assert _download_config(full).document_limit is None
+    assert _download_config(full).full_corpus is True
+
+
+def test_explicit_artifact_root_is_used_without_appending_mode(tmp_path):
+    args = build_parser().parse_args(
+        ["init_vectordb", "full", "--artifact-root", str(tmp_path)]
+    )
+
+    assert _artifact_root(args) == tmp_path
+
+
+def test_run_experiment_defaults_to_simple_agent():
+    args = build_parser().parse_args(["run_exper", "sample"])
+
+    assert args.dataset_mode == "sample"
+    assert args.agent == "simple"
+    assert args.model == "hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M"
+
+
+def test_dataset_mode_is_required_and_validated():
+    parser = build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["download"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["run_exper", "tiny"])
 
 
 def test_ollama_validation_accepts_normalized_hugging_face_model_name(monkeypatch):
@@ -36,34 +82,3 @@ def test_ollama_validation_accepts_normalized_hugging_face_model_name(monkeypatc
     monkeypatch.setattr("urllib.request.urlopen", lambda *_args, **_kwargs: Response())
 
     validate_ollama("http://localhost:11434", DEFAULT_MODEL)
-
-
-def test_cli_exposes_all_pipeline_stages():
-    parser = build_parser()
-    for stage in ("download", "process", "embed", "index", "all", "status"):
-        args = parser.parse_args(["prepare", stage])
-        assert args.prepare_stage == stage
-
-
-def test_cli_exposes_langsmith_commands_without_breaking_local_eval():
-    parser = build_parser()
-    sync_args = parser.parse_args(["langsmith", "sync"])
-    run_args = parser.parse_args(["langsmith", "run", "--all-questions"])
-    compare_args = parser.parse_args(["langsmith", "compare", "simple", "deep"])
-    local_args = parser.parse_args(["eval", "--limit-questions", "2"])
-    assert sync_args.langsmith_command == "sync"
-    assert run_args.langsmith_command == "run"
-    assert run_args.all_questions is True
-    assert compare_args.experiment_a == "simple"
-    assert local_args.command == "eval"
-
-
-def test_old_top_level_index_command_is_removed():
-    parser = build_parser()
-    with pytest.raises(SystemExit):
-        parser.parse_args(["index"])
-
-
-def test_full_download_config_does_not_record_sample_limit():
-    args = build_parser().parse_args(["prepare", "download", "--full"])
-    assert _download_config(args).document_limit is None

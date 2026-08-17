@@ -224,76 +224,41 @@ pip install -e '.[dev]'
 ollama pull hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M
 ```
 
-資料處理採用 schema v2 四階段 pipeline。建立開發用 1,000-document sample artifacts：
+CLI 只提供三條 experiment pipeline。建立開發用 1,000-document sample artifacts，再跑固定 10 題 smoke experiment：
 
 ```bash
-python main.py prepare download
-python main.py prepare process
-python main.py prepare embed
-python main.py prepare index
+python main.py download sample
+python main.py init_vectordb sample
+python main.py run_exper sample
 ```
 
-亦可以用單一命令完成全部階段：
+正式 benchmark 使用同一三條 pipeline，但 mode 改為 `full`：
 
 ```bash
-python main.py prepare all
-```
-
-正式 benchmark 必須重新建立完整 corpus artifacts：
-
-```bash
-python main.py prepare all --full --rebuild
-```
-
-單題問答及批量 evaluation：
-
-```bash
-python main.py ask "What is the relevant policy?" --agent simple --artifact-root artifacts
-python main.py ask "What is the relevant policy?" --agent deep --artifact-root artifacts
-python main.py eval --agent simple --artifact-root artifacts
-python main.py eval --agent deep --all-questions --artifact-root artifacts
+python main.py download full
+python main.py init_vectordb full
+python main.py run_exper full
 ```
 
 Runtime artifacts使用以下結構：
 
 ```text
 artifacts/
-├── source/       # frozen document及question Parquet shards
-├── processed/    # normalized chunk Parquet shards
-├── embeddings/   # 可重用嘅float32 vector NPY shards；ID由chunk artifacts提供
-└── index/        # FAISS、SQLite及index manifest
+├── sample/       # sample mode嘅source、processed、embeddings同index
+└── full/         # full mode嘅source、processed、embeddings同index
 ```
 
-每個stage都有獨立schema v2 checkpoint manifest、config hash、upstream fingerprint同shard checksums；完整runtime metadata只喺最終index manifest組合，避免逐層複製。舊schema v1 index唔可以直接沿用，必須用 `prepare all --rebuild` 重建。`eval`會輸出官方相容嘅 `answers.jsonl`，以及本地retrieval、latency、tool-call同錯誤統計。Sample artifacts只供smoke test，會標示為不可同正式benchmark比較。
+每個stage都有獨立schema v2 checkpoint manifest、config hash、upstream fingerprint同shard checksums；完整runtime metadata只喺最終index manifest組合，避免逐層複製。舊schema v1 index唔可以直接沿用，必須喺相關 pipeline 加上 `--rebuild` 重建。`run_exper`會輸出官方相容嘅 `answers.jsonl`，以及本地retrieval、latency、tool-call同錯誤統計。Sample artifacts只供smoke test，會標示為不可同正式benchmark比較。
 
 ## 9. LangSmith Experiments
 
-LangSmith evaluation係現有本地`eval`嘅補充，會保存agent traces、deterministic retrieval feedback同simple/deep comparison。先設定cloud credentials：
+LangSmith evaluation module 仍可供 Python 程式直接使用，但唔再佔用 top-level CLI；`main.py`只保留上述三條 experiment pipeline。
+
+使用 LangSmith API 前先設定 cloud credentials：
 
 ```bash
 export LANGSMITH_API_KEY="..."
 export LANGSMITH_TRACING=true
-```
-
-將frozen questions同步到以source fingerprint命名嘅immutable dataset snapshot：
-
-```bash
-python main.py langsmith sync \
-  --artifact-root artifacts \
-  --dataset-name EnterpriseRAG-Bench
-```
-
-分別執行兩個agent experiments：
-
-```bash
-python main.py langsmith run --agent simple --limit-questions 10
-python main.py langsmith run --agent deep --limit-questions 10
-```
-
-比較兩個完成嘅experiments：
-
-```bash
-python main.py langsmith compare SIMPLE_EXPERIMENT DEEP_EXPERIMENT
 ```
 
 每次run會喺`runs/langsmith/<experiment-name>/`保存experiment metadata、官方相容`answers.jsonl`、normalized records同summary。LangSmith metrics只係deterministic local-style metrics；answer correctness、completeness同官方Invalid Extra Docs仍然要使用EnterpriseRAG-Bench官方GPT-5.4 evaluator。完整schema、私隱範圍同comparison規則見[`evaluation.md`](evaluation.md)。

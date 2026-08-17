@@ -4,13 +4,13 @@
 
 呢個 repository 有兩條互補嘅 evaluation path：
 
-1. `python main.py eval`：保留本地、可 resume 嘅 answer generation，同時輸出官方相容 `answers.jsonl`。
-2. `python main.py langsmith ...`：將同一份 frozen benchmark questions 同 agent target 放入 LangSmith，保存 traces、deterministic feedback、summary metrics 同 experiment comparisons。
+1. `python main.py run_exper sample|full`：保留本地、可 resume 嘅 answer generation，同時輸出官方相容 `answers.jsonl`。
+2. `eval` package 嘅 LangSmith API：將同一份 frozen benchmark questions 同 agent target 放入 LangSmith，保存 traces、deterministic feedback、summary metrics 同 experiment comparisons。LangSmith 功能唔再係 top-level CLI command。
 
 兩條 path 必須共用同一個 `AgentRunResult` contract、同一個 frozen question snapshot，同一個 FAISS index lineage。LangSmith 唔會重新下載 Hugging Face dataset，亦唔會將 gold answers、answer facts 或 expected document IDs傳入agent。
 
 ```text
-artifacts/source/questions.parquet
+artifacts/<sample|full>/source/questions.parquet
               │
               ├── local eval ──────→ answers.jsonl + run_details.jsonl
               │
@@ -167,26 +167,15 @@ export LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
 export LANGSMITH_WORKSPACE_ID="..."
 ```
 
-LangSmith commands係cloud-required。API key缺少時要即時回傳可操作錯誤；credentials永遠唔寫入config、artifacts或Git。
+LangSmith operations係cloud-required。API key缺少時要即時回傳可操作錯誤；credentials永遠唔寫入config、artifacts或Git。
 
 ### Dataset sync
 
-```bash
-python main.py langsmith sync \
-  --artifact-root artifacts \
-  --dataset-name EnterpriseRAG-Bench
-```
+由 Python 呼叫 `sync_frozen_dataset()`，並傳入 `LangSmithDatasetConfig`。
 
 ### Run experiment
 
-```bash
-python main.py langsmith run \
-  --agent simple \
-  --artifact-root artifacts \
-  --dataset-name EnterpriseRAG-Bench \
-  --limit-questions 10 \
-  --max-concurrency 1
-```
+由 Python 呼叫 `run_langsmith_experiment()`，並傳入 `LangSmithExperimentConfig` 同已建立嘅 RAG agent。
 
 `run`要求dataset已sync並同source fingerprint一致。預設每次建立新immutable experiment；第一版唔extend舊experiment。Experiment metadata保存Git commit、agent/model/top-k、question selection、dataset/index/embedding fingerprints、chunking config同corpus mode。
 
@@ -194,11 +183,7 @@ Default concurrency係1。提高concurrency時，retriever嘅SQLite metadata rea
 
 ### Compare experiments
 
-```bash
-python main.py langsmith compare \
-  SIMPLE_EXPERIMENT_NAME \
-  DEEP_EXPERIMENT_NAME
-```
+由 Python 呼叫 `compare_experiments()`，並傳入兩個 experiment names。
 
 Comparison前必須驗證兩個experiments使用相同dataset/source/index/model/top-k同question selection。Agent mode可以不同。Report包含：
 

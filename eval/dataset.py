@@ -58,7 +58,7 @@ def _source_manifest(config: LangSmithDatasetConfig) -> StageManifest:
     source = load_manifest(layout, "download")
     if source.status != "complete" or not source.output_fingerprint:
         raise ValueError(
-            "Source artifacts are incomplete; run `python main.py prepare download`"
+            "Source artifacts are incomplete; run `python main.py download sample|full`"
         )
     return source
 
@@ -120,7 +120,7 @@ def load_dataset_snapshot(
     if not client.has_dataset(dataset_name=snapshot_name):
         raise FileNotFoundError(
             f"LangSmith dataset {snapshot_name!r} is missing. "
-            "Run `python main.py langsmith sync` first."
+            "Call sync_frozen_dataset() first."
         )
     dataset = client.read_dataset(dataset_name=snapshot_name)
     _validate_dataset_metadata(dataset, _dataset_metadata(source, len(questions)))

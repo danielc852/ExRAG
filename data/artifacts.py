@@ -147,8 +147,10 @@ def shard_info(
 def load_manifest(layout: ArtifactLayout, stage: StageName) -> StageManifest:
     path = layout.manifest_path(stage)
     if not path.exists():
+        command = "download" if stage == "download" else "init_vectordb"
         raise FileNotFoundError(
-            f"Missing {stage} artifacts. Run `python main.py prepare {stage}` first."
+            f"Missing {stage} artifacts. "
+            f"Run `python main.py {command} sample|full` first."
         )
     manifest = StageManifest.model_validate_json(path.read_text(encoding="utf-8"))
     if manifest.schema_version != SCHEMA_VERSION:
@@ -176,8 +178,10 @@ def validate_upstream(layout: ArtifactLayout, stage: StageName) -> StageManifest
     upstream_stage = STAGE_ORDER[position - 1]
     upstream = load_manifest(layout, upstream_stage)
     if upstream.status != "complete" or not upstream.output_fingerprint:
+        command = "download" if upstream_stage == "download" else "init_vectordb"
         raise ValueError(
-            f"Upstream stage {upstream_stage!r} is incomplete; run `python main.py prepare {upstream_stage}`"
+            f"Upstream stage {upstream_stage!r} is incomplete; "
+            f"run `python main.py {command} sample|full`"
         )
     verify_manifest_files(layout, upstream)
     return upstream
