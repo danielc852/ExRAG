@@ -8,8 +8,8 @@ from .utils import (
     question_to_example,
 )
 from .sync import (
-    evaluation_dataset_type,
-    evaluation_questions,
+    get_eval_mode,
+    get_eval_questions,
     load_dataset_snapshot,
     sync_frozen_dataset,
 )
@@ -17,8 +17,8 @@ from .sync import (
 __all__ = [
     "EvaluationDatasetType",
     "create_snapshot_name",
-    "evaluation_dataset_type",
-    "evaluation_questions",
+    "get_eval_mode",
+    "get_eval_questions",
     "get_snapshot_id",
     "load_dataset_snapshot",
     "question_to_example",

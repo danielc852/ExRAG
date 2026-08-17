@@ -17,7 +17,7 @@ from .utils import (
 )
 
 
-def evaluation_dataset_type(source: StageManifest) -> EvaluationDatasetType:
+def get_eval_mode(source: StageManifest) -> EvaluationDatasetType:
     """Map the frozen corpus mode to its evaluation dataset role."""
     corpus_mode = source.metadata.get("corpus_mode")
     if corpus_mode == "sample":
@@ -29,11 +29,11 @@ def evaluation_dataset_type(source: StageManifest) -> EvaluationDatasetType:
     )
 
 
-def evaluation_questions(
+def get_eval_questions(
     questions: list[BenchmarkQuestion], source: StageManifest
 ) -> list[BenchmarkQuestion]:
     """Return only the questions that belong to the frozen evaluation dataset."""
-    dataset_type = evaluation_dataset_type(source)
+    dataset_type = get_eval_mode(source)
     if dataset_type == "sample":
         return sample_data.get_sample_questions(questions, source)
     return questions
@@ -53,8 +53,8 @@ def _snapshot_context(
     config: LangSmithDatasetConfig,
 ) -> tuple[StageManifest, EvaluationDatasetType, list[BenchmarkQuestion], str]:
     source = _source_manifest(config)
-    dataset_type = evaluation_dataset_type(source)
-    questions = evaluation_questions(
+    dataset_type = get_eval_mode(source)
+    questions = get_eval_questions(
         load_frozen_questions(config.artifact_root), source
     )
     snapshot_name = create_snapshot_name(

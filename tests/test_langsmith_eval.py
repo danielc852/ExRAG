@@ -19,8 +19,8 @@ from eval import (
     compare_experiments,
     create_snapshot_name,
     deterministic_evaluator,
-    evaluation_dataset_type,
-    evaluation_questions,
+    get_eval_mode,
+    get_eval_questions,
     question_to_example,
     run_langsmith_experiment,
     sync_frozen_dataset,
@@ -129,12 +129,12 @@ def test_create_snapshot_name_includes_dataset_type_and_fingerprint():
     )
 
 
-def test_evaluation_dataset_type_and_question_scope_follow_source_manifest():
+def test_eval_mode_and_questions_follow_source_manifest():
     questions = [question("q1"), question("q2"), question("q3")]
     sample = source_manifest()
     sample.metadata["sample_question_limit"] = 2
-    assert evaluation_dataset_type(sample) == "sample"
-    assert [item.question_id for item in evaluation_questions(questions, sample)] == [
+    assert get_eval_mode(sample) == "sample"
+    assert [item.question_id for item in get_eval_questions(questions, sample)] == [
         "q1",
         "q2",
     ]
@@ -142,8 +142,8 @@ def test_evaluation_dataset_type_and_question_scope_follow_source_manifest():
     full = source_manifest()
     full.metadata["corpus_mode"] = "full"
     full.metadata["sample_question_limit"] = None
-    assert evaluation_dataset_type(full) == "test"
-    assert evaluation_questions(questions, full) == questions
+    assert get_eval_mode(full) == "test"
+    assert get_eval_questions(questions, full) == questions
 
 
 def test_sample_module_returns_its_question_scope():
