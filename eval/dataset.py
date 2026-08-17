@@ -1,8 +1,8 @@
-"""Synchronize frozen EnterpriseRAG-Bench questions to LangSmith datasets."""
+"""Synchronize sample or held-out EnterpriseRAG-Bench evaluation datasets."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, NAMESPACE_URL, uuid5
 
 from data import ArtifactLayout, BenchmarkQuestion, load_frozen_questions
@@ -11,13 +11,52 @@ from data.artifacts import SCHEMA_VERSION, StageManifest, load_manifest
 from .models import DatasetSyncResult, LangSmithDatasetConfig
 
 
-def dataset_snapshot_name(base_name: str, source_fingerprint: str) -> str:
+EvaluationDatasetType = Literal["sample", "test"]
+
+
+def evaluation_dataset_type(source: StageManifest) -> EvaluationDatasetType:
+    """Map the frozen corpus mode to its evaluation dataset role."""
+    corpus_mode = source.metadata.get("corpus_mode")
+    if corpus_mode == "sample":
+        return "sample"
+    if corpus_mode == "full":
+        return "test"
+    raise ValueError(
+        "Source artifacts do not declare a valid corpus_mode; expected sample or full"
+    )
+
+
+def evaluation_questions(
+    questions: list[BenchmarkQuestion], source: StageManifest
+) -> list[BenchmarkQuestion]:
+    """Return only the questions that belong to the frozen evaluation dataset."""
+    dataset_type = evaluation_dataset_type(source)
+    if dataset_type == "test":
+        return questions
+    limit = source.metadata.get("sample_question_limit")
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+        raise ValueError(
+            "Sample source artifacts require a positive sample_question_limit"
+        )
+    if len(questions) < limit:
+        raise ValueError(
+            f"Sample source requests {limit} questions but only {len(questions)} exist"
+        )
+    return questions[:limit]
+
+
+def dataset_snapshot_name(
+    base_name: str,
+    source_fingerprint: str,
+    dataset_type: EvaluationDatasetType | None = None,
+) -> str:
     base_name = base_name.strip()
     if not base_name:
         raise ValueError("dataset name must not be empty")
     if not source_fingerprint:
         raise ValueError("source fingerprint must not be empty")
-    return f"{base_name}-{source_fingerprint[:12]}"
+    role = f"-{dataset_type}" if dataset_type else ""
+    return f"{base_name}{role}-{source_fingerprint[:12]}"
 
 
 def deterministic_example_id(dataset_name: str, question_id: str) -> UUID:
@@ -30,6 +69,7 @@ def question_to_example(
     ordinal: int,
     dataset_name: str,
     source_fingerprint: str,
+    dataset_type: EvaluationDatasetType = "test",
 ) -> dict[str, Any]:
     return {
         "id": deterministic_example_id(dataset_name, question.question_id),
@@ -48,8 +88,9 @@ def question_to_example(
             "ordinal": ordinal,
             "source_fingerprint": source_fingerprint,
             "schema_version": SCHEMA_VERSION,
+            "dataset_type": dataset_type,
         },
-        "split": "test",
+        "split": dataset_type,
     }
 
 
@@ -63,13 +104,18 @@ def _source_manifest(config: LangSmithDatasetConfig) -> StageManifest:
     return source
 
 
-def _dataset_metadata(source: StageManifest, question_count: int) -> dict[str, Any]:
+def _dataset_metadata(
+    source: StageManifest,
+    question_count: int,
+    dataset_type: EvaluationDatasetType,
+) -> dict[str, Any]:
     return {
         "source_fingerprint": source.output_fingerprint,
         "dataset_revision": source.metadata.get("dataset_revision"),
         "questions_fingerprint": source.metadata.get("questions_fingerprint"),
         "question_count": question_count,
         "artifact_schema_version": SCHEMA_VERSION,
+        "dataset_type": dataset_type,
     }
 
 
@@ -97,6 +143,7 @@ def _expected_examples(
     *,
     dataset_name: str,
     source_fingerprint: str,
+    dataset_type: EvaluationDatasetType,
 ) -> dict[UUID, dict[str, Any]]:
     examples = [
         question_to_example(
@@ -104,6 +151,7 @@ def _expected_examples(
             ordinal=ordinal,
             dataset_name=dataset_name,
             source_fingerprint=source_fingerprint,
+            dataset_type=dataset_type,
         )
         for ordinal, question in enumerate(questions)
     ]
@@ -115,15 +163,22 @@ def load_dataset_snapshot(
     config: LangSmithDatasetConfig,
 ) -> tuple[Any, StageManifest, list[BenchmarkQuestion], str]:
     source = _source_manifest(config)
-    questions = load_frozen_questions(config.artifact_root)
-    snapshot_name = dataset_snapshot_name(config.dataset_name, source.output_fingerprint)
+    dataset_type = evaluation_dataset_type(source)
+    questions = evaluation_questions(
+        load_frozen_questions(config.artifact_root), source
+    )
+    snapshot_name = dataset_snapshot_name(
+        config.dataset_name, source.output_fingerprint, dataset_type
+    )
     if not client.has_dataset(dataset_name=snapshot_name):
         raise FileNotFoundError(
             f"LangSmith dataset {snapshot_name!r} is missing. "
             "Call sync_frozen_dataset() first."
         )
     dataset = client.read_dataset(dataset_name=snapshot_name)
-    _validate_dataset_metadata(dataset, _dataset_metadata(source, len(questions)))
+    _validate_dataset_metadata(
+        dataset, _dataset_metadata(source, len(questions), dataset_type)
+    )
     return dataset, source, questions, snapshot_name
 
 
@@ -132,15 +187,21 @@ def sync_frozen_dataset(
     config: LangSmithDatasetConfig,
 ) -> DatasetSyncResult:
     source = _source_manifest(config)
-    questions = load_frozen_questions(config.artifact_root)
-    snapshot_name = dataset_snapshot_name(config.dataset_name, source.output_fingerprint)
-    expected_metadata = _dataset_metadata(source, len(questions))
+    dataset_type = evaluation_dataset_type(source)
+    questions = evaluation_questions(
+        load_frozen_questions(config.artifact_root), source
+    )
+    snapshot_name = dataset_snapshot_name(
+        config.dataset_name, source.output_fingerprint, dataset_type
+    )
+    expected_metadata = _dataset_metadata(source, len(questions), dataset_type)
     created_dataset = not client.has_dataset(dataset_name=snapshot_name)
     if created_dataset:
         dataset = client.create_dataset(
             snapshot_name,
             description=(
-                "Frozen EnterpriseRAG-Bench questions for reproducible RAG experiments"
+                f"Frozen EnterpriseRAG-Bench {dataset_type} questions for "
+                "reproducible RAG experiments"
             ),
             metadata=expected_metadata,
         )
@@ -152,6 +213,7 @@ def sync_frozen_dataset(
         questions,
         dataset_name=snapshot_name,
         source_fingerprint=source.output_fingerprint,
+        dataset_type=dataset_type,
     )
     existing_examples = {
         example.id: example
@@ -192,6 +254,7 @@ def sync_frozen_dataset(
     return DatasetSyncResult(
         dataset_id=str(dataset.id),
         dataset_name=snapshot_name,
+        dataset_type=dataset_type,
         source_fingerprint=source.output_fingerprint,
         total_examples=len(expected_examples),
         created_examples=len(missing),

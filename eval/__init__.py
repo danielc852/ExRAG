@@ -3,6 +3,8 @@
 from .dataset import (
     dataset_snapshot_name,
     deterministic_example_id,
+    evaluation_dataset_type,
+    evaluation_questions,
     question_to_example,
     sync_frozen_dataset,
 )
@@ -57,6 +59,8 @@ __all__ = [
     "dataset_snapshot_name",
     "deterministic_evaluator",
     "deterministic_example_id",
+    "evaluation_dataset_type",
+    "evaluation_questions",
     "deterministic_summary_evaluator",
     "document_recall",
     "evaluate_question",

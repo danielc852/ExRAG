@@ -60,6 +60,7 @@ def _experiment_metadata(
         "git_commit": _git_commit(),
         "dataset_id": str(dataset.id),
         "dataset_name": str(dataset.name),
+        "dataset_type": dataset.metadata.get("dataset_type"),
         "source_fingerprint": source.output_fingerprint,
         "index_fingerprint": index.output_fingerprint,
         "embedding_fingerprint": index.metadata.get("embedding_fingerprint"),

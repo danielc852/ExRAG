@@ -52,6 +52,7 @@ class LangSmithDatasetConfig(BaseModel):
 class DatasetSyncResult(BaseModel):
     dataset_id: str
     dataset_name: str
+    dataset_type: Literal["sample", "test"]
     source_fingerprint: str
     total_examples: int
     created_examples: int

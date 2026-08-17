@@ -17,6 +17,8 @@ from eval import (
     build_langsmith_target,
     compare_experiments,
     deterministic_evaluator,
+    evaluation_dataset_type,
+    evaluation_questions,
     question_to_example,
     run_langsmith_experiment,
     sync_frozen_dataset,
@@ -45,6 +47,8 @@ def source_manifest() -> StageManifest:
         metadata={
             "dataset_revision": "commit",
             "questions_fingerprint": "questions",
+            "corpus_mode": "sample",
+            "sample_question_limit": 2,
         },
     )
 
@@ -92,7 +96,7 @@ class FakeDatasetClient:
 
 @pytest.fixture
 def frozen_questions(monkeypatch):
-    questions = [question("q1"), question("q2")]
+    questions = [question("q1"), question("q2"), question("q3")]
     manifest = source_manifest()
     monkeypatch.setattr(dataset_module, "_source_manifest", lambda _config: manifest)
     monkeypatch.setattr(
@@ -112,7 +116,25 @@ def test_question_example_keeps_gold_data_out_of_inputs():
     assert "gold_answer" not in payload["inputs"]
     assert payload["outputs"]["gold_answer"] == "Gold answer"
     assert payload["metadata"]["ordinal"] == 3
+    assert payload["metadata"]["dataset_type"] == "test"
     assert payload["split"] == "test"
+
+
+def test_evaluation_dataset_type_and_question_scope_follow_source_manifest():
+    questions = [question("q1"), question("q2"), question("q3")]
+    sample = source_manifest()
+    sample.metadata["sample_question_limit"] = 2
+    assert evaluation_dataset_type(sample) == "sample"
+    assert [item.question_id for item in evaluation_questions(questions, sample)] == [
+        "q1",
+        "q2",
+    ]
+
+    full = source_manifest()
+    full.metadata["corpus_mode"] = "full"
+    full.metadata["sample_question_limit"] = None
+    assert evaluation_dataset_type(full) == "test"
+    assert evaluation_questions(questions, full) == questions
 
 
 def test_dataset_sync_is_idempotent_and_repairs_partial_sync(
@@ -127,6 +149,8 @@ def test_dataset_sync_is_idempotent_and_repairs_partial_sync(
     unchanged = sync_frozen_dataset(client, config)
     assert created.status == "created"
     assert created.created_examples == 2
+    assert created.dataset_name == "EnterpriseRAG-Bench-sample-abcdef123456"
+    assert created.dataset_type == "sample"
     assert unchanged.status == "unchanged"
     assert unchanged.created_examples == 0
 
@@ -253,13 +277,16 @@ def test_experiment_runner_wires_langsmith_and_writes_artifacts(
 ):
     source = source_manifest()
     benchmark_question = question()
-    snapshot_name = "EnterpriseRAG-Bench-abcdef123456"
-    dataset = SimpleNamespace(id=uuid4(), name=snapshot_name)
+    snapshot_name = "EnterpriseRAG-Bench-sample-abcdef123456"
+    dataset = SimpleNamespace(
+        id=uuid4(), name=snapshot_name, metadata={"dataset_type": "sample"}
+    )
     example_payload = question_to_example(
         benchmark_question,
         ordinal=0,
         dataset_name=snapshot_name,
         source_fingerprint=source.output_fingerprint,
+        dataset_type="sample",
     )
     example = SimpleNamespace(
         id=example_payload["id"],
@@ -318,6 +345,7 @@ def test_experiment_runner_wires_langsmith_and_writes_artifacts(
     assert client.evaluate_kwargs["blocking"] is True
     assert client.evaluate_kwargs["max_concurrency"] == 1
     assert client.evaluate_kwargs["metadata"]["git_commit"] == "commit"
+    assert client.evaluate_kwargs["metadata"]["dataset_type"] == "sample"
     assert result.summary.completed == 1
     assert (result.output_dir / "answers.jsonl").exists()
     assert (result.output_dir / "records.jsonl").exists()

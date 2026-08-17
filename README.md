@@ -72,10 +72,11 @@ complete benchmark.
    meaningful improvement within the project's quality, latency, and cost
    constraints.
 
-Create the evaluation set before substantial optimization and separate it into
-a development set and a held-out test set. Use the development set for repeated
-experiments and reserve the held-out set for confirmation so that improvements
-reflect generalization rather than tuning to known questions.
+Create the evaluation set before substantial optimization. ExRAG treats the
+10-question `sample` dataset as the development/smoke set for repeated
+experiments and the complete `test` dataset as held-out confirmation. Dataset
+type is derived from the frozen artifact lineage, so a sample index cannot be
+silently evaluated against held-out questions.
 
 ## Quick start
 

@@ -14,7 +14,7 @@ artifacts/<sample|full>/source/questions.parquet
               │
               ├── local eval ──────→ answers.jsonl + run_details.jsonl
               │
-              └── LangSmith dataset
+              └── LangSmith sample or test dataset
                          ↓
                   simple / deep target
                          ↓
@@ -66,14 +66,25 @@ Responsibilities：
 - `results.py`：LangSmith result normalization、本地artifacts同experiment comparison。
 - `__init__.py`：只re-export穩定public API，保留現有`from eval import ...` imports。
 
-## 4. LangSmith Dataset Contract
+## 4. Evaluation Dataset Contract
+
+Evaluation資料分為兩類：
+
+- `sample`：細型development/smoke dataset。Sample artifacts只會使用manifest入面
+  `sample_question_limit`指定嘅題目（預設10題），可以喺開發期間反覆執行。
+- `test`：完整、frozen、held-out dataset。只用於確認候選改動能否generalize，避免用
+  test結果反覆調參。
+
+Dataset type由source artifact嘅`corpus_mode`自動推導：`sample` corpus對應
+`sample` dataset，`full` corpus對應`test` dataset。Caller唔可以手動覆寫，避免將
+sample index同held-out questions錯配。
 
 ### Snapshot identity
 
 CLI接受dataset base name，預設為`EnterpriseRAG-Bench`。實際LangSmith dataset name係：
 
 ```text
-{base_name}-{source_output_fingerprint[:12]}
+{base_name}-{sample|test}-{source_output_fingerprint[:12]}
 ```
 
 因此每個本地frozen source snapshot都有獨立cloud dataset。Dataset metadata保存完整fingerprint、dataset revision、question count同artifact schema version。
@@ -107,11 +118,13 @@ Example metadata：
   "source_types": ["slack"],
   "ordinal": 0,
   "source_fingerprint": "...",
-  "schema_version": 2
+  "schema_version": 2,
+  "dataset_type": "sample"
 }
 ```
 
-每個example加入`test` split。Example UUID使用dataset snapshot name同question ID經UUIDv5產生，令sync可重複。Sync規則：
+每個example加入同dataset type一致嘅`sample`或`test` split，metadata亦保存
+`dataset_type`。Example UUID使用dataset snapshot name同question ID經UUIDv5產生，令sync可重複。Sync規則：
 
 - Dataset不存在：建立dataset同全部examples。
 - Dataset及全部examples一致：idempotent no-op。
