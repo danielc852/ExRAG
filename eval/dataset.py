@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
-from uuid import UUID, NAMESPACE_URL, uuid5
+from typing import Any
+from uuid import UUID
 
 from data import ArtifactLayout, BenchmarkQuestion, load_frozen_questions
 from data.artifacts import SCHEMA_VERSION, StageManifest, load_manifest
 
+from .datasets import sample_data, test_data
+from .datasets.utils import (
+    EvaluationDatasetType,
+    dataset_snapshot_name,
+    deterministic_example_id,
+)
 from .models import DatasetSyncResult, LangSmithDatasetConfig
-
-
-EvaluationDatasetType = Literal["sample", "test"]
 
 
 def evaluation_dataset_type(source: StageManifest) -> EvaluationDatasetType:
@@ -31,36 +34,8 @@ def evaluation_questions(
 ) -> list[BenchmarkQuestion]:
     """Return only the questions that belong to the frozen evaluation dataset."""
     dataset_type = evaluation_dataset_type(source)
-    if dataset_type == "test":
-        return questions
-    limit = source.metadata.get("sample_question_limit")
-    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
-        raise ValueError(
-            "Sample source artifacts require a positive sample_question_limit"
-        )
-    if len(questions) < limit:
-        raise ValueError(
-            f"Sample source requests {limit} questions but only {len(questions)} exist"
-        )
-    return questions[:limit]
-
-
-def dataset_snapshot_name(
-    base_name: str,
-    source_fingerprint: str,
-    dataset_type: EvaluationDatasetType | None = None,
-) -> str:
-    base_name = base_name.strip()
-    if not base_name:
-        raise ValueError("dataset name must not be empty")
-    if not source_fingerprint:
-        raise ValueError("source fingerprint must not be empty")
-    role = f"-{dataset_type}" if dataset_type else ""
-    return f"{base_name}{role}-{source_fingerprint[:12]}"
-
-
-def deterministic_example_id(dataset_name: str, question_id: str) -> UUID:
-    return uuid5(NAMESPACE_URL, f"langsmith://{dataset_name}/{question_id}")
+    module = sample_data if dataset_type == "sample" else test_data
+    return module.select_questions(questions, source)
 
 
 def question_to_example(
@@ -71,27 +46,13 @@ def question_to_example(
     source_fingerprint: str,
     dataset_type: EvaluationDatasetType = "test",
 ) -> dict[str, Any]:
-    return {
-        "id": deterministic_example_id(dataset_name, question.question_id),
-        "inputs": {
-            "question_id": question.question_id,
-            "question": question.question,
-        },
-        "outputs": {
-            "gold_answer": question.gold_answer,
-            "expected_doc_ids": question.expected_doc_ids,
-            "answer_facts": question.answer_facts,
-        },
-        "metadata": {
-            "question_type": question.question_type,
-            "source_types": question.source_types,
-            "ordinal": ordinal,
-            "source_fingerprint": source_fingerprint,
-            "schema_version": SCHEMA_VERSION,
-            "dataset_type": dataset_type,
-        },
-        "split": dataset_type,
-    }
+    module = sample_data if dataset_type == "sample" else test_data
+    return module.question_to_example(
+        question,
+        ordinal=ordinal,
+        dataset_name=dataset_name,
+        source_fingerprint=source_fingerprint,
+    )
 
 
 def _source_manifest(config: LangSmithDatasetConfig) -> StageManifest:

@@ -10,6 +10,7 @@ import eval.dataset as dataset_module
 import eval.experiment as experiment_module
 from agent import AgentRunResult
 from data import BenchmarkQuestion, StageManifest
+from eval.datasets import sample_data, test_data
 from eval import (
     LangSmithDatasetConfig,
     LangSmithExperimentConfig,
@@ -135,6 +136,21 @@ def test_evaluation_dataset_type_and_question_scope_follow_source_manifest():
     full.metadata["sample_question_limit"] = None
     assert evaluation_dataset_type(full) == "test"
     assert evaluation_questions(questions, full) == questions
+
+
+def test_sample_and_test_modules_share_schema_with_distinct_splits():
+    kwargs = {
+        "ordinal": 0,
+        "dataset_name": "dataset",
+        "source_fingerprint": "fingerprint",
+    }
+    sample = sample_data.question_to_example(question(), **kwargs)
+    test = test_data.question_to_example(question(), **kwargs)
+
+    assert sample["inputs"] == test["inputs"]
+    assert sample["outputs"] == test["outputs"]
+    assert sample["split"] == "sample"
+    assert test["split"] == "test"
 
 
 def test_dataset_sync_is_idempotent_and_repairs_partial_sync(
