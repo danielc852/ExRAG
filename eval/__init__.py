@@ -1,7 +1,7 @@
 """Stable public API for local and LangSmith evaluation."""
 
 from .dataset import (
-    dataset_snapshot_name,
+    create_snapshot_name,
     deterministic_example_id,
     evaluation_dataset_type,
     evaluation_questions,
@@ -56,7 +56,7 @@ __all__ = [
     "append_run_detail",
     "build_langsmith_target",
     "compare_experiments",
-    "dataset_snapshot_name",
+    "create_snapshot_name",
     "deterministic_evaluator",
     "deterministic_example_id",
     "evaluation_dataset_type",

@@ -17,6 +17,7 @@ from eval import (
     aggregate_outputs,
     build_langsmith_target,
     compare_experiments,
+    create_snapshot_name,
     deterministic_evaluator,
     evaluation_dataset_type,
     evaluation_questions,
@@ -119,6 +120,13 @@ def test_question_example_keeps_gold_data_out_of_inputs():
     assert payload["metadata"]["ordinal"] == 3
     assert payload["metadata"]["dataset_type"] == "test"
     assert payload["split"] == "test"
+
+
+def test_create_snapshot_name_includes_dataset_type_and_fingerprint():
+    assert (
+        create_snapshot_name("EnterpriseRAG-Bench", "abcdef1234567890", "sample")
+        == "EnterpriseRAG-Bench-sample-abcdef123456"
+    )
 
 
 def test_evaluation_dataset_type_and_question_scope_follow_source_manifest():

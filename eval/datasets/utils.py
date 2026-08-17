@@ -12,7 +12,7 @@ from data.artifacts import SCHEMA_VERSION
 EvaluationDatasetType = Literal["sample", "test"]
 
 
-def dataset_snapshot_name(
+def create_snapshot_name(
     base_name: str,
     source_fingerprint: str,
     dataset_type: EvaluationDatasetType | None = None,

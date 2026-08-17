@@ -12,7 +12,7 @@ from .datasets import sample_data, test_data
 from .datasets.utils import (
     EvaluationDatasetType,
     build_question_example,
-    dataset_snapshot_name,
+    create_snapshot_name,
     deterministic_example_id,
 )
 from .models import DatasetSyncResult, LangSmithDatasetConfig
@@ -130,7 +130,7 @@ def load_dataset_snapshot(
     questions = evaluation_questions(
         load_frozen_questions(config.artifact_root), source
     )
-    snapshot_name = dataset_snapshot_name(
+    snapshot_name = create_snapshot_name(
         config.dataset_name, source.output_fingerprint, dataset_type
     )
     if not client.has_dataset(dataset_name=snapshot_name):
@@ -154,7 +154,7 @@ def sync_frozen_dataset(
     questions = evaluation_questions(
         load_frozen_questions(config.artifact_root), source
     )
-    snapshot_name = dataset_snapshot_name(
+    snapshot_name = create_snapshot_name(
         config.dataset_name, source.output_fingerprint, dataset_type
     )
     expected_metadata = _dataset_metadata(source, len(questions), dataset_type)
