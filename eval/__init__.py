@@ -1,10 +1,10 @@
 """Stable public API for local and LangSmith evaluation."""
 
-from .dataset import (
+from .datasets import (
     create_snapshot_name,
-    get_snapshot_id,
     evaluation_dataset_type,
     evaluation_questions,
+    get_snapshot_id,
     question_to_example,
     sync_frozen_dataset,
 )

@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-import eval.dataset as dataset_module
+import eval.datasets.sync as dataset_module
 import eval.experiment as experiment_module
 from agent import AgentRunResult
 from data import BenchmarkQuestion, StageManifest
