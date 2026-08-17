@@ -9,12 +9,11 @@ from data import ArtifactLayout, BenchmarkQuestion, load_frozen_questions
 from data.artifacts import SCHEMA_VERSION, StageManifest, load_manifest
 
 from ..models import DatasetSyncResult, LangSmithDatasetConfig
-from . import sample_data, test_data
+from . import sample_data
 from .utils import (
     EvaluationDatasetType,
     create_snapshot_name,
-    format_questions,
-    get_snapshot_id,
+    question_to_example,
 )
 
 
@@ -37,24 +36,7 @@ def evaluation_questions(
     dataset_type = evaluation_dataset_type(source)
     if dataset_type == "sample":
         return sample_data.get_sample_questions(questions, source)
-    return test_data.get_full_questions(questions)
-
-
-def question_to_example(
-    question: BenchmarkQuestion,
-    *,
-    ordinal: int,
-    dataset_name: str,
-    source_fingerprint: str,
-    dataset_type: EvaluationDatasetType = "test",
-) -> dict[str, Any]:
-    return format_questions(
-        question,
-        ordinal=ordinal,
-        dataset_name=dataset_name,
-        source_fingerprint=source_fingerprint,
-        dataset_type=dataset_type,
-    )
+    return questions
 
 
 def _source_manifest(config: LangSmithDatasetConfig) -> StageManifest:

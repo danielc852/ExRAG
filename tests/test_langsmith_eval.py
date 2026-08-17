@@ -10,7 +10,7 @@ import eval.datasets.sync as dataset_module
 import eval.experiment as experiment_module
 from agent import AgentRunResult
 from data import BenchmarkQuestion, StageManifest
-from eval.datasets import sample_data, test_data
+from eval.datasets import sample_data
 from eval import (
     LangSmithDatasetConfig,
     LangSmithExperimentConfig,
@@ -146,12 +146,11 @@ def test_evaluation_dataset_type_and_question_scope_follow_source_manifest():
     assert evaluation_questions(questions, full) == questions
 
 
-def test_sample_and_test_modules_return_their_question_scopes():
+def test_sample_module_returns_its_question_scope():
     questions = [question("q1"), question("q2"), question("q3")]
     source = source_manifest()
 
     assert sample_data.get_sample_questions(questions, source) == questions[:2]
-    assert test_data.get_full_questions(questions) == questions
 
 
 def test_dataset_sync_is_idempotent_and_repairs_partial_sync(

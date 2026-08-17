@@ -1,16 +1,16 @@
 """Selection, serialization, and synchronization for evaluation datasets."""
 
-from . import sample_data, test_data
+from . import sample_data
 from .utils import (
     EvaluationDatasetType,
     create_snapshot_name,
     get_snapshot_id,
+    question_to_example,
 )
 from .sync import (
     evaluation_dataset_type,
     evaluation_questions,
     load_dataset_snapshot,
-    question_to_example,
     sync_frozen_dataset,
 )
 
@@ -24,5 +24,4 @@ __all__ = [
     "question_to_example",
     "sample_data",
     "sync_frozen_dataset",
-    "test_data",
 ]

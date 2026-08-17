@@ -30,15 +30,15 @@ def get_snapshot_id(dataset_name: str, question_id: str) -> UUID:
     return uuid5(NAMESPACE_URL, f"langsmith://{dataset_name}/{question_id}")
 
 
-def format_questions(
+def question_to_example(
     question: BenchmarkQuestion,
     *,
     ordinal: int,
     dataset_name: str,
     source_fingerprint: str,
-    dataset_type: EvaluationDatasetType,
+    dataset_type: EvaluationDatasetType = "test",
 ) -> dict[str, Any]:
-    """Format a question for sample or test datasets without exposing gold inputs."""
+    """Format one question without exposing gold data in its inputs."""
     return {
         "id": get_snapshot_id(dataset_name, question.question_id),
         "inputs": {
