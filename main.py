@@ -253,6 +253,7 @@ def _agent_stack(args: argparse.Namespace) -> Iterator[Any]:
             retriever,
             default_top_k=args.top_k,
             include_filters=False,
+            use_full_user_question=True,
         )
         model = create_ollama_model(args.model, args.ollama_url)
         yield create_rag_agent(args.agent, model, retrieval_tool)

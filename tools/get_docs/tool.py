@@ -21,6 +21,23 @@ from tools.get_docs.schema import (
 DESCRIPTION_PATH = Path(__file__).with_name("retrieve_documents.md")
 
 
+def _first_user_question(state: Any) -> str | None:
+    messages = state.get("messages", []) if isinstance(state, dict) else []
+    for message in messages:
+        if isinstance(message, dict):
+            message_type = message.get("type") or message.get("role")
+            content = message.get("content", "")
+        else:
+            message_type = getattr(message, "type", None)
+            content = getattr(message, "content", "")
+        if message_type not in {"human", "user"} or not isinstance(content, str):
+            continue
+        question = content.strip()
+        if question:
+            return question
+    return None
+
+
 def load_tool_description() -> str:
     """Load the agent-facing tool instructions kept beside the implementation."""
     return DESCRIPTION_PATH.read_text(encoding="utf-8").strip()
@@ -185,9 +202,10 @@ def create_retrieval_tool(
     default_top_k: int = 5,
     max_top_k: int = 20,
     include_filters: bool = True,
+    use_full_user_question: bool = False,
 ):
     """Create a tool whose artifact retains structured retrieval evidence."""
-    from langchain.tools import tool
+    from langchain.tools import ToolRuntime, tool
 
     if default_top_k < 1 or default_top_k > max_top_k:
         raise ValueError("default_top_k must be within the allowed top-k range")
@@ -198,20 +216,23 @@ def create_retrieval_tool(
         include_filters=include_filters,
     )
 
-    @tool(
-        "retrieve_documents",
-        args_schema=input_schema,
-        description=load_tool_description(),
-        response_format="content_and_artifact",
-    )
     def retrieve_documents(
         query: str,
+        runtime: Any,
         top_k: int = default_top_k,
         source_types: list[str] | None = None,
         document_ids: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
+        if use_full_user_question:
+            query = _first_user_question(runtime.state) or query
         filters = RetrievalFilters(source_types=source_types, document_ids=document_ids)
         result = retriever.search(query, top_k=top_k, filters=filters)
         return format_chunks_for_agent(result), result.model_dump()
 
-    return retrieve_documents
+    retrieve_documents.__annotations__["runtime"] = ToolRuntime
+    return tool(
+        "retrieve_documents",
+        args_schema=input_schema,
+        description=load_tool_description(),
+        response_format="content_and_artifact",
+    )(retrieve_documents)

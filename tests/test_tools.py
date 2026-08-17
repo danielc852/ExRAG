@@ -19,6 +19,7 @@ from tools import (
     format_chunks_for_agent,
     load_tool_description,
 )
+from tools.get_docs.tool import _first_user_question
 
 
 class FakeEmbedding:
@@ -141,3 +142,14 @@ def test_tool_can_hide_filters_from_benchmark_agents():
         assert set(schema["properties"]) == {"query", "top_k"}
     finally:
         retriever.close()
+
+
+def test_first_user_question_preserves_the_complete_original_query():
+    state = {
+        "messages": [
+            {"role": "user", "content": "  Complete question with qualifiers?  "},
+            {"role": "assistant", "content": "A rewritten query"},
+        ]
+    }
+
+    assert _first_user_question(state) == "Complete question with qualifiers?"
