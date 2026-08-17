@@ -138,19 +138,12 @@ def test_evaluation_dataset_type_and_question_scope_follow_source_manifest():
     assert evaluation_questions(questions, full) == questions
 
 
-def test_sample_and_test_modules_share_schema_with_distinct_splits():
-    kwargs = {
-        "ordinal": 0,
-        "dataset_name": "dataset",
-        "source_fingerprint": "fingerprint",
-    }
-    sample = sample_data.question_to_example(question(), **kwargs)
-    test = test_data.question_to_example(question(), **kwargs)
+def test_sample_and_test_modules_return_their_question_scopes():
+    questions = [question("q1"), question("q2"), question("q3")]
+    source = source_manifest()
 
-    assert sample["inputs"] == test["inputs"]
-    assert sample["outputs"] == test["outputs"]
-    assert sample["split"] == "sample"
-    assert test["split"] == "test"
+    assert sample_data.get_sample_questions(questions, source) == questions[:2]
+    assert test_data.get_full_questions(questions) == questions
 
 
 def test_dataset_sync_is_idempotent_and_repairs_partial_sync(

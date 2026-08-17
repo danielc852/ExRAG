@@ -11,6 +11,7 @@ from data.artifacts import SCHEMA_VERSION, StageManifest, load_manifest
 from .datasets import sample_data, test_data
 from .datasets.utils import (
     EvaluationDatasetType,
+    build_question_example,
     dataset_snapshot_name,
     deterministic_example_id,
 )
@@ -34,8 +35,9 @@ def evaluation_questions(
 ) -> list[BenchmarkQuestion]:
     """Return only the questions that belong to the frozen evaluation dataset."""
     dataset_type = evaluation_dataset_type(source)
-    module = sample_data if dataset_type == "sample" else test_data
-    return module.select_questions(questions, source)
+    if dataset_type == "sample":
+        return sample_data.get_sample_questions(questions, source)
+    return test_data.get_full_questions(questions)
 
 
 def question_to_example(
@@ -46,12 +48,12 @@ def question_to_example(
     source_fingerprint: str,
     dataset_type: EvaluationDatasetType = "test",
 ) -> dict[str, Any]:
-    module = sample_data if dataset_type == "sample" else test_data
-    return module.question_to_example(
+    return build_question_example(
         question,
         ordinal=ordinal,
         dataset_name=dataset_name,
         source_fingerprint=source_fingerprint,
+        dataset_type=dataset_type,
     )
 
 

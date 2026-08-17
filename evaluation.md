@@ -66,8 +66,8 @@ Responsibilities：
 - `models.py`：Pydantic configs、sync result、experiment record、summary同comparison models。
 - `local.py`：原有resumable local evaluation、official answers同local metrics。
 - `dataset.py`：協調dataset type，並將frozen questions同步成immutable LangSmith snapshot。
-- `datasets/sample_data.py`：sample題目範圍同sample example建立規則。
-- `datasets/test_data.py`：完整held-out test題目同test example建立規則。
+- `datasets/sample_data.py`：用`get_sample_questions()`提供sample題目範圍。
+- `datasets/test_data.py`：用`get_full_questions()`返回完整held-out test題目。
 - `datasets/utils.py`：兩種dataset共用嘅snapshot命名、deterministic UUID同example schema。
 - `evaluators.py`：row-level同experiment-level deterministic evaluators。
 - `experiment.py`：target factory、experiment metadata同`Client.evaluate()` wiring。
