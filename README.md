@@ -1,6 +1,57 @@
 # ExRAG
 
-ExRAG is a reproducible retrieval-augmented generation (RAG) baseline for EnterpriseRAG-Bench. It provides a local data preparation and FAISS retrieval pipeline, simple and deep agent options, and evaluation workflows for comparing results.
+ExRAG is an experimental workbench for learning how to build a robust
+retrieval-augmented generation (RAG) system with EnterpriseRAG-Bench. A
+reproducible baseline is the starting point, not the final goal: each experiment
+changes a controlled part of the pipeline, records its behavior, and uses the
+evidence to guide the next iteration.
+
+It provides a local data-preparation and FAISS retrieval pipeline, simple and
+deep agent methods, interchangeable generation and embedding models, and local
+or LangSmith evaluation workflows for comparing results.
+
+## Project goal and learning loop
+
+The project studies RAG as a complete system. A robust result should retrieve
+the right evidence, answer faithfully, fail clearly when evidence is missing,
+remain reproducible across runs, and expose enough latency and trace data to
+diagnose regressions.
+
+Progress is developed through the following loop:
+
+```text
+Establish a reproducible baseline
+              ↓
+Choose one retrieval, model, or agent hypothesis
+              ↓
+Run the same frozen evaluation scope
+              ↓
+Measure quality, retrieval, latency, cost, and failures
+              ↓
+Inspect per-question traces and failure cases
+              ↓
+Keep, revise, or reject the change
+              ↓
+Record the evidence and start the next experiment
+```
+
+The experiment programme covers these layers:
+
+| Layer | What the experiments are intended to learn |
+| --- | --- |
+| Data integrity | Whether source documents, chunks, vectors, metadata, and questions share a verified lineage |
+| Retrieval | How embedding models, chunking, overlap, and retrieval depth affect relevant-document recall and noise |
+| Agent behavior | Whether simple or deeper multi-step retrieval improves grounded answers without unnecessary calls |
+| Generation | How local LLM choice affects correctness, completeness, latency, token use, and instruction following |
+| Robustness | How the system behaves with missing evidence, conflicting sources, retrieval misses, interrupted runs, or corrupted artifacts |
+| Evaluation | Which local deterministic signals predict official semantic answer quality and which require an external judge |
+| Operations and privacy | Whether runs are resumable, observable, reproducible, and safe to inspect or share |
+
+Every meaningful experiment should state its hypothesis, frozen test scope,
+changed variable, controlled variables, models, input lineage, output directory,
+recorded metrics, observed failures, and conclusion. Sample runs provide a fast
+learning loop; full runs determine whether an improvement generalizes across the
+complete benchmark.
 
 ## Quick start
 
