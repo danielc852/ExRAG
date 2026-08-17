@@ -17,6 +17,10 @@ Replace `sample` with `full` in all three commands for a full experiment. By
 default, the two modes use separate `artifacts/sample` and `artifacts/full`
 directories.
 
+The reproducible record for the rebuilt 2026-08-17 sample run, including its
+scope, models, input sources, output files, and per-question measurements, is in
+[`sample_experiment_2026-08-17.md`](sample_experiment_2026-08-17.md).
+
 ## MLX embeddings on Apple Silicon
 
 The vector pipeline supports two embedding engines: the existing
