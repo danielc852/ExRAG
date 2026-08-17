@@ -10,8 +10,7 @@
 
 | 項目 | 設定 |
 | --- | --- |
-| 執行日期 | 2026-08-17（Asia/Hong_Kong） |
-| Git commit | `9475067a213d565989fd0992b64df1f7c24da51e` |
+| 執行日期 | 2026-08-17 |
 | Corpus mode | `sample` |
 | Agent mode | `simple` |
 | 問題數量 | 10 |
@@ -90,6 +89,8 @@ Experiment output directory：`runs/sample/rebuild-20260817-simple/`
 
 因為 10 題全部成功，所以今次冇產生 `errors.jsonl`。
 
+對外保留嘅 `answers.jsonl` 同 `run_details.jsonl` 已做 privacy sanitization：答案文字內嘅人名已替換成 `[REDACTED]`。問題內容、答案語意、document IDs、metrics 同 token/latency 記錄保持不變。
+
 ## 6. Latency 定義
 
 `run_details.jsonl` 入面嘅 `latency_ms` 係 input-to-complete-output end-to-end latency：
@@ -150,3 +151,11 @@ Experiment output directory：`runs/sample/rebuild-20260817-simple/`
 - Parquet、NumPy、FAISS、SQLite counts 一致。
 - 所有 experiment retrieved document IDs 都存在於重建後嘅 SQLite store。
 - 10 個 expected gold documents 全部存在於 sample corpus 同 final index。
+
+## 10. Privacy treatment
+
+- Experiment report 冇保存人名、電郵地址、電話號碼、本機 username、home-directory path 或其他直接個人識別資料。
+- 非必要嘅 timezone 同 Git commit hash 已由 report 移除。
+- Output answers 原本包含嘅 synthetic benchmark 人名已統一替換成 `[REDACTED]`。
+- Benchmark document IDs 同 dataset fingerprints 屬於技術 lineage identifiers，唔代表自然人，並因可重現性同 retrieval verification 而保留。
+- 原始 public synthetic benchmark corpus 冇被改寫；privacy sanitization 只套用到今次 experiment 對外輸出同報告。
