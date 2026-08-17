@@ -26,11 +26,11 @@ def create_snapshot_name(
     return f"{base_name}{role}-{source_fingerprint[:12]}"
 
 
-def deterministic_example_id(dataset_name: str, question_id: str) -> UUID:
+def get_snapshot_id(dataset_name: str, question_id: str) -> UUID:
     return uuid5(NAMESPACE_URL, f"langsmith://{dataset_name}/{question_id}")
 
 
-def build_question_example(
+def format_questions(
     question: BenchmarkQuestion,
     *,
     ordinal: int,
@@ -38,9 +38,9 @@ def build_question_example(
     source_fingerprint: str,
     dataset_type: EvaluationDatasetType,
 ) -> dict[str, Any]:
-    """Build the common LangSmith example schema without exposing gold inputs."""
+    """Format a question for sample or test datasets without exposing gold inputs."""
     return {
-        "id": deterministic_example_id(dataset_name, question.question_id),
+        "id": get_snapshot_id(dataset_name, question.question_id),
         "inputs": {
             "question_id": question.question_id,
             "question": question.question,

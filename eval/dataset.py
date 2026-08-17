@@ -11,9 +11,9 @@ from data.artifacts import SCHEMA_VERSION, StageManifest, load_manifest
 from .datasets import sample_data, test_data
 from .datasets.utils import (
     EvaluationDatasetType,
-    build_question_example,
     create_snapshot_name,
-    deterministic_example_id,
+    get_snapshot_id,
+    format_questions,
 )
 from .models import DatasetSyncResult, LangSmithDatasetConfig
 
@@ -48,7 +48,7 @@ def question_to_example(
     source_fingerprint: str,
     dataset_type: EvaluationDatasetType = "test",
 ) -> dict[str, Any]:
-    return build_question_example(
+    return format_questions(
         question,
         ordinal=ordinal,
         dataset_name=dataset_name,
