@@ -7,6 +7,7 @@ from main import (
     SAMPLE_DOCUMENT_LIMIT,
     _artifact_root,
     _download_config,
+    _embedding_config,
     build_parser,
     validate_ollama,
 )
@@ -48,6 +49,23 @@ def test_explicit_artifact_root_is_used_without_appending_mode(tmp_path):
     )
 
     assert _artifact_root(args) == tmp_path
+
+
+def test_init_vectordb_accepts_mlx_embedding_engine_and_model():
+    args = build_parser().parse_args(
+        [
+            "init_vectordb",
+            "sample",
+            "--embedding-engine",
+            "mlx",
+            "--embedding-model",
+            "mlx-community/bge-small-en-v1.5-bf16",
+        ]
+    )
+
+    config = _embedding_config(args)
+    assert config.engine == "mlx"
+    assert config.model_name == "mlx-community/bge-small-en-v1.5-bf16"
 
 
 def test_run_experiment_defaults_to_simple_agent():

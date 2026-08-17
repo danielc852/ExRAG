@@ -39,6 +39,9 @@ DEFAULT_ARTIFACT_ROOT = Path(os.getenv("RAG_ARTIFACT_ROOT", "artifacts"))
 DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_EMBEDDING = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
+DEFAULT_EMBEDDING_ENGINE = os.getenv(
+    "EMBEDDING_ENGINE", "sentence-transformers"
+)
 DEFAULT_REVISION = os.getenv("DATASET_REVISION", "main")
 SAMPLE_DOCUMENT_LIMIT = 1_000
 SAMPLE_QUESTION_LIMIT = 10
@@ -105,6 +108,12 @@ def build_parser() -> argparse.ArgumentParser:
     init_vectordb.add_argument("--chunk-size", type=int, default=512)
     init_vectordb.add_argument("--chunk-overlap", type=int, default=64)
     init_vectordb.add_argument("--embedding-model", default=DEFAULT_EMBEDDING)
+    init_vectordb.add_argument(
+        "--embedding-engine",
+        choices=("sentence-transformers", "mlx"),
+        default=DEFAULT_EMBEDDING_ENGINE,
+        help="Embedding inference engine (default: EMBEDDING_ENGINE or sentence-transformers)",
+    )
     init_vectordb.add_argument("--embedding-revision")
     init_vectordb.add_argument("--embedding-batch-size", type=int, default=32)
     init_vectordb.add_argument("--index-batch-size", type=int, default=10_000)
@@ -155,6 +164,7 @@ def _processing_config(args: argparse.Namespace) -> ProcessingConfig:
 def _embedding_config(args: argparse.Namespace) -> EmbeddingConfig:
     return EmbeddingConfig(
         artifact_root=_artifact_root(args),
+        engine=args.embedding_engine,
         model_name=args.embedding_model,
         model_revision=args.embedding_revision,
         batch_size=args.embedding_batch_size,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ class ProcessingConfig:
 @dataclass(frozen=True)
 class EmbeddingConfig:
     artifact_root: Path = Path("artifacts")
+    engine: Literal["sentence-transformers", "mlx"] = "sentence-transformers"
     model_name: str = "BAAI/bge-base-en-v1.5"
     model_revision: str | None = None
     batch_size: int = 32

@@ -10,6 +10,7 @@ from typing import Any
 
 from data.artifacts import ArtifactLayout
 from data.processing import FAISS_NAME, SQLITE_NAME, validate_index
+from data.processing.embed_model import create_embedding_model, encode_chunk_shard
 from tools.get_docs.schema import (
     RetrievalFilters,
     RetrievalResult,
@@ -63,7 +64,6 @@ class FaissRetriever:
     @classmethod
     def load(cls, artifact_root: Path) -> "FaissRetriever":
         import faiss
-        from sentence_transformers import SentenceTransformer
 
         layout = ArtifactLayout(artifact_root)
         manifest = validate_index(artifact_root)
@@ -78,8 +78,14 @@ class FaissRetriever:
             connection.close()
             raise ValueError("Index manifest does not identify its embedding model")
         revision = manifest.metadata.get("embedding_revision")
-        kwargs = {"revision": revision} if revision else {}
-        embedding_model = SentenceTransformer(model_name, **kwargs)
+        engine = str(
+            manifest.metadata.get("embedding_engine", "sentence-transformers")
+        )
+        embedding_model = create_embedding_model(
+            model_name,
+            revision,
+            engine=engine,
+        )
         return cls(index=index, connection=connection, embedding_model=embedding_model)
 
     def _matching_rows(
@@ -138,8 +144,11 @@ class FaissRetriever:
             raise ValueError(f"top_k must be between 1 and {self.max_top_k}")
 
         started = time.perf_counter()
-        vector = self.embedding_model.encode(
-            [query], convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False
+        vector = encode_chunk_shard(
+            self.embedding_model,
+            [query],
+            batch_size=1,
+            normalize=True,
         )
         vector = np.asarray(vector, dtype="float32")
         candidate_count = min(top_k * 5, int(self.index.ntotal))

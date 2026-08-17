@@ -45,7 +45,11 @@ def embed_chunks(
         verify_manifest_files(layout, manifest)
         return manifest
 
-    model = create_embedding_model(config.model_name, config.model_revision)
+    model = create_embedding_model(
+        config.model_name,
+        config.model_revision,
+        engine=config.engine,
+    )
     chunk_shards = sorted(
         (shard for shard in upstream.shards if shard.kind == "chunks"),
         key=lambda shard: shard.path,
@@ -100,6 +104,7 @@ def embed_chunks(
     manifest.metadata = {
         "source_fingerprint": upstream.metadata.get("source_fingerprint"),
         "processed_fingerprint": upstream.output_fingerprint,
+        "embedding_engine": config.engine,
         "embedding_model": config.model_name,
         "embedding_revision": config.model_revision,
         "embedding_dimension": dimension,
