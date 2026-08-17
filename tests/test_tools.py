@@ -115,6 +115,8 @@ def test_tool_schema_defines_input_and_output_contracts():
     ).chunks == []
     with pytest.raises(ValidationError):
         RetrieveDocumentsInput(query="benefits policy", top_k=21)
+    with pytest.raises(ValidationError):
+        RetrieveDocumentsInput(query="benefits policy", source_types=["document"])
 
 
 def test_tool_uses_markdown_description_and_configured_schema():
@@ -127,5 +129,15 @@ def test_tool_uses_markdown_description_and_configured_schema():
         schema = retrieval_tool.args_schema.model_json_schema()
         assert schema["properties"]["top_k"]["default"] == 2
         assert schema["properties"]["top_k"]["maximum"] == 3
+    finally:
+        retriever.close()
+
+
+def test_tool_can_hide_filters_from_benchmark_agents():
+    retriever = make_retriever()
+    try:
+        retrieval_tool = create_retrieval_tool(retriever, include_filters=False)
+        schema = retrieval_tool.args_schema.model_json_schema()
+        assert set(schema["properties"]) == {"query", "top_k"}
     finally:
         retriever.close()

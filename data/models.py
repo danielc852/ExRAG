@@ -43,6 +43,7 @@ class DownloadConfig:
     dataset_revision: str = "main"
     full_corpus: bool = False
     document_limit: int | None = 1_000
+    sample_question_limit: int | None = 10
     seed: int = 42
     shard_size: int = 1_000
     cache_dir: Path | None = None

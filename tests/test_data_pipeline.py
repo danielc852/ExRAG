@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 
 import numpy as np
+import pyarrow.parquet as pq
 import pytest
 
 import data.preprocessing.download as download_module
@@ -177,6 +178,47 @@ def test_completed_stage_is_idempotent_and_config_change_requires_rebuild(
     changed = DownloadConfig(artifact_root=root, document_limit=1, shard_size=1)
     with pytest.raises(ValueError, match="Use --rebuild"):
         download_dataset(changed)
+
+
+def test_sample_download_includes_gold_documents_before_seeded_fill(
+    tmp_path, monkeypatch
+):
+    documents = FakeDataset(
+        [
+            {"doc_id": "filler-1", "source_type": "slack", "title": "One", "content": "One"},
+            {"doc_id": "filler-2", "source_type": "gmail", "title": "Two", "content": "Two"},
+            {"doc_id": "gold", "source_type": "github", "title": "Gold", "content": "Answer"},
+        ],
+        "documents-fingerprint",
+    )
+    questions = FakeDataset(
+        [
+            {
+                "question_id": "q1",
+                "question_type": "basic",
+                "source_types": ["github"],
+                "question": "What is the answer?",
+                "expected_doc_ids": ["gold"],
+                "gold_answer": "Answer",
+                "answer_facts": ["Answer"],
+            }
+        ],
+        "questions-fingerprint",
+    )
+    monkeypatch.setattr(
+        download_module,
+        "load_hf_dataset",
+        lambda name, **_kwargs: documents if name == "documents" else questions,
+    )
+
+    root = tmp_path / "artifacts"
+    manifest = download_dataset(
+        DownloadConfig(artifact_root=root, document_limit=2, shard_size=2)
+    )
+    table = pq.read_table(ArtifactLayout(root).source / "documents/part-000000.parquet")
+
+    assert "gold" in set(table.column("doc_id").to_pylist())
+    assert manifest.metadata["required_document_count"] == 1
 
 
 def test_download_resumes_only_unfinished_shards_and_cleans_temp_files(

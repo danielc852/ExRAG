@@ -9,6 +9,10 @@ from agent.helpers import _artifact_payload, _message_content
 from agent.state import AgentMode, AgentRunResult, ToolCallTrace
 
 
+SIMPLE_RECURSION_LIMIT = 24
+DEEP_RECURSION_LIMIT = 16
+
+
 def agent_result(
     messages: list[Any],
     *,
@@ -103,7 +107,11 @@ def run_agent(
     try:
         response = agent.invoke(
             {"messages": [{"role": "user", "content": question}]},
-            config={"recursion_limit": 16 if mode == "deep" else 10},
+            config={
+                "recursion_limit": (
+                    DEEP_RECURSION_LIMIT if mode == "deep" else SIMPLE_RECURSION_LIMIT
+                )
+            },
         )
         messages = response.get("messages", []) if isinstance(response, dict) else []
         return agent_result(

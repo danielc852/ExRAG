@@ -101,7 +101,7 @@ def test_evaluation_resumes_completed_answers(tmp_path: Path):
 
         def invoke(self, _payload, config):
             self.calls += 1
-            assert config["recursion_limit"] == 10
+            assert config["recursion_limit"] == 24
             return {
                 "messages": [
                     SimpleNamespace(

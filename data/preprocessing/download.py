@@ -76,13 +76,55 @@ def _write_parquet_atomic(table: pa.Table, destination: Path) -> None:
     temporary.replace(destination)
 
 
-def _selected_indices(total: int, config: DownloadConfig) -> list[int]:
+def _required_document_ids(
+    questions: list[dict[str, Any]], question_limit: int | None
+) -> list[str]:
+    if question_limit is None:
+        return []
+    if question_limit < 1:
+        raise ValueError("sample question limit must be at least 1")
+    required: list[str] = []
+    for question in questions[:question_limit]:
+        required.extend(str(value) for value in question["expected_doc_ids"])
+    return list(dict.fromkeys(required))
+
+
+def _selected_indices(
+    documents: Any,
+    questions: list[dict[str, Any]],
+    config: DownloadConfig,
+) -> tuple[list[int], int]:
+    total = len(documents)
     if config.full_corpus:
-        return list(range(total))
+        return list(range(total)), 0
     if config.document_limit is None or config.document_limit < 1:
         raise ValueError("document limit must be at least 1")
     count = min(config.document_limit, total)
-    return random.Random(config.seed).sample(range(total), count)
+    required_ids = _required_document_ids(questions, config.sample_question_limit)
+    if len(required_ids) > count:
+        raise ValueError(
+            "document limit is too small to include the selected questions' gold documents"
+        )
+
+    required_set = set(required_ids)
+    required_by_id: dict[str, int] = {}
+    for row_index, row in enumerate(documents):
+        document_id = str(row.get("doc_id", ""))
+        if document_id in required_set:
+            required_by_id.setdefault(document_id, row_index)
+            if len(required_by_id) == len(required_ids):
+                break
+    missing = [document_id for document_id in required_ids if document_id not in required_by_id]
+    if missing:
+        raise ValueError(
+            f"Dataset is missing {len(missing)} gold documents required by sample questions"
+        )
+
+    required_indices = [required_by_id[document_id] for document_id in required_ids]
+    required_index_set = set(required_indices)
+    available = [index for index in range(total) if index not in required_index_set]
+    filler = random.Random(config.seed).sample(available, count - len(required_indices))
+    return required_indices + filler, len(required_indices)
 
 
 def download_dataset(
@@ -104,11 +146,13 @@ def download_dataset(
     questions = load_hf_dataset(
         "questions", revision=config.dataset_revision, cache_dir=config.cache_dir
     )
-    indices = _selected_indices(len(documents), config)
+    question_rows = [_question_payload(dict(row)) for row in questions]
+    indices, required_document_count = _selected_indices(
+        documents, question_rows, config
+    )
     source_dir = layout.source
 
     if "questions" not in manifest.completed_units:
-        question_rows = [_question_payload(dict(row)) for row in questions]
         question_path = source_dir / "questions.parquet"
         _write_parquet_atomic(pa.Table.from_pylist(question_rows), question_path)
         manifest.shards.append(
@@ -167,6 +211,10 @@ def download_dataset(
             "questions_fingerprint": str(getattr(questions, "_fingerprint", "unknown")),
             "corpus_mode": "full" if config.full_corpus else "sample",
             "document_limit": None if config.full_corpus else len(indices),
+            "sample_question_limit": (
+                None if config.full_corpus else config.sample_question_limit
+            ),
+            "required_document_count": required_document_count,
             "seed": config.seed,
         }
     )

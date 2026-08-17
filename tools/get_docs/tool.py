@@ -180,7 +180,11 @@ def format_chunks_for_agent(result: RetrievalResult) -> str:
 
 
 def create_retrieval_tool(
-    retriever: FaissRetriever, *, default_top_k: int = 5, max_top_k: int = 20
+    retriever: FaissRetriever,
+    *,
+    default_top_k: int = 5,
+    max_top_k: int = 20,
+    include_filters: bool = True,
 ):
     """Create a tool whose artifact retains structured retrieval evidence."""
     from langchain.tools import tool
@@ -191,6 +195,7 @@ def create_retrieval_tool(
     input_schema = create_input_schema(
         default_top_k=default_top_k,
         max_top_k=max_top_k,
+        include_filters=include_filters,
     )
 
     @tool(

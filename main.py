@@ -136,6 +136,7 @@ def _download_config(args: argparse.Namespace) -> DownloadConfig:
         dataset_revision=args.dataset_revision,
         full_corpus=is_full,
         document_limit=None if is_full else args.sample_size,
+        sample_question_limit=None if is_full else SAMPLE_QUESTION_LIMIT,
         seed=args.seed,
         shard_size=args.shard_size,
         cache_dir=args.cache_dir,
@@ -248,7 +249,11 @@ def validate_ollama(base_url: str, model_name: str) -> None:
 def _agent_stack(args: argparse.Namespace) -> Iterator[Any]:
     validate_ollama(args.ollama_url, args.model)
     with FaissRetriever.load(_artifact_root(args)) as retriever:
-        retrieval_tool = create_retrieval_tool(retriever, default_top_k=args.top_k)
+        retrieval_tool = create_retrieval_tool(
+            retriever,
+            default_top_k=args.top_k,
+            include_filters=False,
+        )
         model = create_ollama_model(args.model, args.ollama_url)
         yield create_rag_agent(args.agent, model, retrieval_tool)
 

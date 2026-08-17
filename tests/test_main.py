@@ -35,8 +35,10 @@ def test_sample_and_full_modes_use_separate_default_artifacts():
     assert _artifact_root(sample).as_posix() == "artifacts/sample"
     assert _artifact_root(full).as_posix() == "artifacts/full"
     assert _download_config(sample).document_limit == SAMPLE_DOCUMENT_LIMIT
+    assert _download_config(sample).sample_question_limit == 10
     assert _download_config(sample).full_corpus is False
     assert _download_config(full).document_limit is None
+    assert _download_config(full).sample_question_limit is None
     assert _download_config(full).full_corpus is True
 
 
