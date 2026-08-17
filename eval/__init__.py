@@ -2,7 +2,7 @@
 
 from .dataset import (
     create_snapshot_name,
-    deterministic_example_id,
+    get_snapshot_id,
     evaluation_dataset_type,
     evaluation_questions,
     question_to_example,
@@ -58,7 +58,7 @@ __all__ = [
     "compare_experiments",
     "create_snapshot_name",
     "deterministic_evaluator",
-    "deterministic_example_id",
+    "get_snapshot_id",
     "evaluation_dataset_type",
     "evaluation_questions",
     "deterministic_summary_evaluator",

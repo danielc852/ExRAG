@@ -8,7 +8,7 @@ from typing import Any, Callable
 from agent import run_agent
 from data import validate_index
 
-from .dataset import deterministic_example_id, load_dataset_snapshot
+from .dataset import get_snapshot_id, load_dataset_snapshot
 from .evaluators import deterministic_evaluator, deterministic_summary_evaluator
 from .local import select_questions
 from .models import (
@@ -102,7 +102,7 @@ def run_langsmith_experiment(
         question_types=config.question_types,
     )
     example_ids = [
-        deterministic_example_id(snapshot_name, question.question_id)
+        get_snapshot_id(snapshot_name, question.question_id)
         for question in selected
     ]
     examples_by_id = {
