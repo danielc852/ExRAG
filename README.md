@@ -55,11 +55,18 @@ complete benchmark.
 
 ## Working plan
 
-1. **Build the basic engine.** Implement the end-to-end ingestion, chunking,
+Current position: step 1 is implemented, the sample/test evaluation split is in
+place, and the next milestone is to complete step 2 with a frozen 10-question
+sample baseline. A cloud Ollama path has also been proven through an SSH tunnel;
+it still needs to run the same sample evaluation before it can be compared with
+the local baseline.
+
+1. **Build the basic engine — complete.** Implement the end-to-end ingestion, chunking,
    embedding, indexing, retrieval, generation, and source-tracking pipeline.
-2. **Establish the simple RAG baseline.** Freeze an evaluation scope and record
+2. **Establish the simple RAG baseline — current.** Freeze the 10-question
+   `sample` scope and record
    answer quality, retrieval quality, latency, token usage, cost, and failures.
-3. **Research algorithms and model options.** Compare relevant chunking,
+3. **Research algorithms and model options — next.** Compare relevant chunking,
    embedding, retrieval, reranking, generation-model, and agent approaches, then
    prioritize testable hypotheses.
 4. **Optimize the system.** Improve one controlled variable at a time through
