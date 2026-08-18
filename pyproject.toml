@@ -23,7 +23,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov>=5.0"]
-local = ["sentence-transformers>=3.0"]
 mlx = ["mlx-embeddings>=0.1,<0.2"]
 
 [tool.hatch.build.targets.wheel]

@@ -1,4 +1,4 @@
-"""SentenceTransformer-shaped adapter around the OpenRouter API client."""
+"""Embedding adapter around the OpenRouter API client."""
 
 from __future__ import annotations
 

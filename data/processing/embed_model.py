@@ -11,11 +11,11 @@ import numpy as np
 from .embeddings.openrouter import OpenRouterClient, OpenRouterEmbedder
 
 
-EmbeddingEngine = Literal["sentence-transformers", "mlx", "openrouter"]
+EmbeddingEngine = Literal["mlx", "openrouter"]
 
 
 class MlxEmbeddingModel:
-    """SentenceTransformer-shaped adapter around ``mlx-embeddings``."""
+    """Embedding adapter around ``mlx-embeddings``."""
 
     def __init__(
         self,
@@ -126,7 +126,7 @@ def create_embedding_model(
     model_name: str,
     revision: str | None = None,
     *,
-    engine: EmbeddingEngine = "sentence-transformers",
+    engine: EmbeddingEngine = "openrouter",
 ):
     if engine == "mlx":
         return _create_mlx_embedding_model(model_name, revision)
@@ -134,19 +134,7 @@ def create_embedding_model(
         if revision:
             raise ValueError("OpenRouter embedding models do not accept revisions")
         return OpenRouterEmbedder(model_name, client=OpenRouterClient.from_env())
-    if engine != "sentence-transformers":
-        raise ValueError(f"Unsupported embedding engine: {engine!r}")
-
-    try:
-        from sentence_transformers import SentenceTransformer
-    except ImportError as exc:
-        raise RuntimeError(
-            "Sentence Transformers dependencies are missing; install them with "
-            "`uv sync --extra local`"
-        ) from exc
-
-    kwargs = {"revision": revision} if revision else {}
-    return SentenceTransformer(model_name, **kwargs)
+    raise ValueError(f"Unsupported embedding engine: {engine!r}")
 
 
 def encode_chunk_shard(

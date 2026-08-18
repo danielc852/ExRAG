@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import builtins
 from types import SimpleNamespace
 
 import numpy as np
@@ -81,17 +80,3 @@ def test_mlx_engine_rejects_non_apple_silicon_before_importing_dependencies(
 def test_unknown_embedding_engine_is_rejected():
     with pytest.raises(ValueError, match="Unsupported embedding engine"):
         create_embedding_model("model", engine="unknown")
-
-
-def test_sentence_transformers_engine_explains_optional_dependency(monkeypatch):
-    real_import = builtins.__import__
-
-    def missing_sentence_transformers(name, *args, **kwargs):
-        if name == "sentence_transformers":
-            raise ImportError("not installed")
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", missing_sentence_transformers)
-
-    with pytest.raises(RuntimeError, match="uv sync --extra local"):
-        create_embedding_model("model", engine="sentence-transformers")

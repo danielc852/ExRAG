@@ -67,7 +67,7 @@ class ProcessingConfig:
 @dataclass(frozen=True)
 class EmbeddingConfig:
     artifact_root: Path = Path("artifacts")
-    engine: Literal["sentence-transformers", "mlx", "openrouter"] = "openrouter"
+    engine: Literal["mlx", "openrouter"] = "openrouter"
     model_name: str = field(default_factory=_default_embedding_model)
     model_revision: str | None = None
     batch_size: int = 32

@@ -78,14 +78,22 @@ class FaissRetriever:
             connection.close()
             raise ValueError("Index manifest does not identify its embedding model")
         revision = manifest.metadata.get("embedding_revision")
-        engine = str(
-            manifest.metadata.get("embedding_engine", "sentence-transformers")
-        )
-        embedding_model = create_embedding_model(
-            model_name,
-            revision,
-            engine=engine,
-        )
+        engine = manifest.metadata.get("embedding_engine")
+        if engine not in {"openrouter", "mlx"}:
+            connection.close()
+            raise ValueError(
+                f"Index uses unsupported embedding engine {engine!r}; rebuild it "
+                "with OpenRouter or MLX"
+            )
+        try:
+            embedding_model = create_embedding_model(
+                model_name,
+                revision,
+                engine=engine,
+            )
+        except Exception:
+            connection.close()
+            raise
         return cls(index=index, connection=connection, embedding_model=embedding_model)
 
     def _matching_rows(

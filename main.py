@@ -117,7 +117,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_vectordb.add_argument("--embedding-model", default=DEFAULT_EMBEDDING)
     init_vectordb.add_argument(
         "--embedding-engine",
-        choices=("sentence-transformers", "mlx", "openrouter"),
+        choices=("openrouter", "mlx"),
         default=DEFAULT_EMBEDDING_ENGINE,
         help="Embedding inference engine (default: EMBEDDING_ENGINE or openrouter)",
     )

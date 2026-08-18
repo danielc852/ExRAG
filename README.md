@@ -122,7 +122,7 @@ ExRAG supports controlled experiments across four main variables:
 | Agent method | `--agent` | `simple` or `deep` |
 | Generation model | `--model` | Any compatible chat model already installed in Ollama |
 | Retrieval depth | `--top-k` | Default number of chunks requested by the retrieval tool; default `5`, maximum `20` |
-| Embedding engine/model | `--embedding-engine`, `--embedding-model` | `openrouter`, `sentence-transformers`, or compatible `mlx` embeddings |
+| Embedding engine/model | `--embedding-engine`, `--embedding-model` | `openrouter` or compatible `mlx` embeddings |
 
 The `simple` method is a bounded LangChain tool-calling agent with at most three
 retrieval calls. The `deep` method uses Deep Agents for multi-step retrieval and
@@ -187,36 +187,37 @@ artifact root for every retrieval configuration so indexes and their lineage
 remain isolated:
 
 ```bash
-# Retrieval configuration A
+# Retrieval configuration A: hosted OpenRouter embeddings
 python main.py download sample \
-  --artifact-root artifacts/experiments/bge-base
+  --artifact-root artifacts/experiments/nemotron-openrouter
 python main.py init_vectordb sample \
-  --artifact-root artifacts/experiments/bge-base \
-  --embedding-engine sentence-transformers \
-  --embedding-model BAAI/bge-base-en-v1.5 \
+  --artifact-root artifacts/experiments/nemotron-openrouter \
+  --embedding-engine openrouter \
+  --embedding-model nvidia/nemotron-3-embed-1b:free \
+  --tokenizer-model BAAI/bge-base-en-v1.5 \
   --chunk-size 512 \
   --chunk-overlap 64
 python main.py run_exper sample \
-  --artifact-root artifacts/experiments/bge-base \
+  --artifact-root artifacts/experiments/nemotron-openrouter \
   --agent simple \
   --model lfm2.5-2.6b:q4_k_m \
-  --output-dir runs/sample/bge-base-simple \
+  --output-dir runs/sample/nemotron-openrouter-simple \
   --no-resume
 
-# Retrieval configuration B
+# Retrieval configuration B: local MLX embeddings on Apple Silicon
 python main.py download sample \
-  --artifact-root artifacts/experiments/embedding-b
+  --artifact-root artifacts/experiments/bge-mlx
 python main.py init_vectordb sample \
-  --artifact-root artifacts/experiments/embedding-b \
-  --embedding-engine sentence-transformers \
-  --embedding-model <embedding-model-b> \
+  --artifact-root artifacts/experiments/bge-mlx \
+  --embedding-engine mlx \
+  --embedding-model mlx-community/bge-small-en-v1.5-bf16 \
   --chunk-size 384 \
   --chunk-overlap 48
 python main.py run_exper sample \
-  --artifact-root artifacts/experiments/embedding-b \
+  --artifact-root artifacts/experiments/bge-mlx \
   --agent simple \
   --model lfm2.5-2.6b:q4_k_m \
-  --output-dir runs/sample/embedding-b-simple \
+  --output-dir runs/sample/bge-mlx-simple \
   --no-resume
 ```
 
@@ -287,18 +288,6 @@ Hugging Face tokenizer identifier. Responses are validated, converted to
 normalized `float32` arrays, and written to the existing sharded artifact
 format.
 
-For local Sentence Transformers embeddings, install the optional dependency and
-select the engine explicitly:
-
-```bash
-uv sync --extra local
-python main.py init_vectordb sample \
-  --embedding-engine sentence-transformers \
-  --embedding-model BAAI/bge-base-en-v1.5 \
-  --tokenizer-model BAAI/bge-base-en-v1.5 \
-  --rebuild
-```
-
 ## MLX embeddings on Apple Silicon
 
 The vector pipeline also supports an optional native `mlx-embeddings` engine.
@@ -340,6 +329,6 @@ The embedding manifest records the engine, model, and optional revision. Query
 retrieval loads those exact settings, so document and query vectors cannot
 silently use different backends. Embeddings remain normalized `float32` NumPy
 shards and the FAISS cosine-similarity index format is unchanged. Changing the
-engine or model requires `--rebuild`; existing Sentence Transformers indexes
-remain readable because manifests without an engine field default to
-`sentence-transformers`.
+engine or model requires `--rebuild`. Indexes created with the removed Sentence
+Transformers engine, including older manifests without an engine field, must be
+rebuilt with OpenRouter or MLX before retrieval.

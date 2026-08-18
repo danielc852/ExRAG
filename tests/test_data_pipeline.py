@@ -115,7 +115,7 @@ def configs(root: Path):
         ProcessingConfig(artifact_root=root, tokenizer_model="fake"),
         EmbeddingConfig(
             artifact_root=root,
-            engine="sentence-transformers",
+            engine="mlx",
             model_name="fake",
             batch_size=2,
         ),
@@ -154,7 +154,7 @@ def test_pipeline_builds_sharded_artifacts_and_retrieves(tmp_path, fake_sources,
     assert source.stats["document_shard_count"] == 2
     assert processed.stats["chunk_count"] == 2
     assert embeddings.stats["vector_count"] == 2
-    assert embeddings.metadata["embedding_engine"] == "sentence-transformers"
+    assert embeddings.metadata["embedding_engine"] == "mlx"
     assert {shard.kind for shard in embeddings.shards} == {"vectors"}
     assert index.stats["chunk_count"] == 2
     assert index.metadata["source_fingerprint"] == source.output_fingerprint
@@ -181,8 +181,22 @@ def test_pipeline_builds_sharded_artifacts_and_retrieves(tmp_path, fake_sources,
     assert loaded == {
         "model": "fake",
         "revision": None,
-        "engine": "sentence-transformers",
+        "engine": "mlx",
     }
+
+
+def test_retriever_rejects_removed_sentence_transformers_index(
+    tmp_path, fake_sources
+):
+    root = tmp_path / "artifacts"
+    run_fake_pipeline(root)
+    layout = ArtifactLayout(root)
+    manifest = load_manifest(layout, "index")
+    manifest.metadata["embedding_engine"] = "sentence-transformers"
+    write_manifest_atomic(layout, manifest)
+
+    with pytest.raises(ValueError, match="unsupported embedding engine"):
+        FaissRetriever.load(root)
 
 
 def test_completed_stage_is_idempotent_and_config_change_requires_rebuild(
