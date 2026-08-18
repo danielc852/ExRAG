@@ -198,7 +198,7 @@ LangSmith operations係cloud-required。API key缺少時要即時回傳可操作
 
 由 Python 呼叫 `run_langsmith_experiment()`，並傳入 `LangSmithExperimentConfig` 同已建立嘅 RAG agent。
 
-`run`要求dataset已sync並同source fingerprint一致。預設每次建立新immutable experiment；第一版唔extend舊experiment。Experiment metadata保存Git commit、agent/model/top-k、question selection、dataset/index/embedding fingerprints、chunking config同corpus mode。
+`run`要求dataset已sync並同source fingerprint一致。預設每次建立新immutable experiment；第一版唔extend舊experiment。Experiment metadata保存Git commit、LLM provider、agent/model/top-k、question selection、dataset/index/embedding fingerprints、chunking config同corpus mode。
 
 Default concurrency係1。提高concurrency時，retriever嘅SQLite metadata reads會使用thread-safe connection加lock；FAISS只執行read-only search。
 

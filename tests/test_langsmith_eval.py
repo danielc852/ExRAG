@@ -362,6 +362,7 @@ def test_experiment_runner_wires_langsmith_and_writes_artifacts(
     assert client.evaluate_kwargs["max_concurrency"] == 1
     assert client.evaluate_kwargs["metadata"]["git_commit"] == "commit"
     assert client.evaluate_kwargs["metadata"]["dataset_type"] == "sample"
+    assert client.evaluate_kwargs["metadata"]["llm_provider"] == "ollama"
     assert result.summary.completed == 1
     assert (result.output_dir / "answers.jsonl").exists()
     assert (result.output_dir / "records.jsonl").exists()

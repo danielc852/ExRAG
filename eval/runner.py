@@ -163,6 +163,10 @@ def _write_run_config(
         existing_index = existing.get("index", {})
         checks = {
             "agent mode": (existing_evaluation.get("agent_mode"), config.agent_mode),
+            "LLM provider": (
+                existing_evaluation.get("llm_provider", "ollama"),
+                config.llm_provider,
+            ),
             "model": (existing_evaluation.get("model_name"), config.model_name),
             "question limit": (
                 existing_evaluation.get("question_limit"),

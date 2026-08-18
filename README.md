@@ -115,12 +115,13 @@ scope, models, input sources, output files, and per-question measurements, is in
 
 ## Evaluate different RAG methods and models
 
-ExRAG supports controlled experiments across four main variables:
+ExRAG supports controlled experiments across five main variables:
 
 | Variable | CLI option | Supported choices |
 | --- | --- | --- |
 | Agent method | `--agent` | `simple` or `deep` |
-| Generation model | `--model` | Any compatible chat model already installed in Ollama |
+| LLM provider | `--llm` | `ollama` (default) or `openrouter` |
+| Generation model | `--model` | A concrete model name supported by the selected LLM provider |
 | Retrieval depth | `--top-k` | Default number of chunks requested by the retrieval tool; default `5`, maximum `20` |
 | Embedding engine/model | `--embedding-engine`, `--embedding-model` | `openrouter` or compatible `mlx` embeddings |
 
@@ -179,6 +180,27 @@ python main.py run_exper sample \
 Generation-model comparisons do not require rebuilding the vector store. The
 same embedding model recorded in the index manifest is automatically loaded for
 every retrieval query.
+
+### Use OpenRouter for generation
+
+Ollama remains the default generation provider, so existing commands continue
+to work unchanged. To use a hosted OpenRouter chat model, select it explicitly;
+`OPENROUTER_API_KEY` and optional `OPENROUTER_BASE_URL` are shared with the
+embedding integration:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-v1-...
+python main.py run_exper sample \
+  --llm openrouter \
+  --model openai/gpt-4.1-mini \
+  --output-dir runs/sample/openrouter-gpt-4.1-mini \
+  --no-resume
+```
+
+Chat and embedding requests use separate endpoint adapters while sharing the
+same API key, base URL, timeout, and common OpenRouter headers. The selected LLM
+provider and concrete model are both saved in run configuration metadata, so a
+resumed run cannot silently switch either setting.
 
 ### Compare embedding models or chunking strategies
 
