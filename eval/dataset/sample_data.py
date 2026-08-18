@@ -5,6 +5,7 @@ from __future__ import annotations
 from data import BenchmarkQuestion
 from data.artifacts import StageManifest
 
+
 def get_sample_questions(
     questions: list[BenchmarkQuestion], source: StageManifest
 ) -> list[BenchmarkQuestion]:

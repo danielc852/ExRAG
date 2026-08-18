@@ -1,17 +1,17 @@
 """Selection, serialization, and synchronization for evaluation datasets."""
 
 from . import sample_data
-from .utils import (
-    EvaluationDatasetType,
-    create_snapshot_name,
-    get_snapshot_id,
-    question_to_example,
-)
 from .sync import (
     get_eval_mode,
     get_eval_questions,
     load_dataset_snapshot,
     sync_frozen_dataset,
+)
+from .utils import (
+    EvaluationDatasetType,
+    create_snapshot_name,
+    get_snapshot_id,
+    question_to_example,
 )
 
 __all__ = [

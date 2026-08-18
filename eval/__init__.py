@@ -1,6 +1,6 @@
 """Stable public API for local and LangSmith evaluation."""
 
-from .datasets import (
+from .dataset import (
     create_snapshot_name,
     get_eval_mode,
     get_eval_questions,

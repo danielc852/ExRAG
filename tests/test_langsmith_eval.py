@@ -6,11 +6,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
-import eval.datasets.sync as dataset_module
+import eval.dataset.sync as dataset_module
 import eval.experiment as experiment_module
 from agent import AgentRunResult
 from data import BenchmarkQuestion, StageManifest
-from eval.datasets import sample_data
+from eval.dataset import sample_data
 from eval import (
     LangSmithDatasetConfig,
     LangSmithExperimentConfig,

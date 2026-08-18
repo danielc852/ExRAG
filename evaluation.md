@@ -50,11 +50,10 @@ eval/
 ├── __init__.py
 ├── models.py
 ├── runner.py
-├── dataset.py
-├── datasets/
+├── dataset/
 │   ├── __init__.py
+│   ├── sync.py
 │   ├── sample_data.py
-│   ├── test_data.py
 │   └── utils.py
 ├── evaluators.py
 ├── experiment.py
@@ -65,10 +64,9 @@ Responsibilities：
 
 - `models.py`：Pydantic configs、sync result、experiment record、summary同comparison models。
 - `runner.py`：resumable local evaluation runner、official answers同local metrics。
-- `dataset.py`：協調dataset type，並將frozen questions同步成immutable LangSmith snapshot。
-- `datasets/sample_data.py`：用`get_sample_questions()`提供sample題目範圍。
-- `datasets/test_data.py`：用`get_full_questions()`返回完整held-out test題目。
-- `datasets/utils.py`：兩種dataset共用嘅snapshot命名、deterministic UUID同example schema。
+- `dataset/sync.py`：協調dataset type，並將frozen questions同步成immutable LangSmith snapshot。
+- `dataset/sample_data.py`：用`get_sample_questions()`提供sample題目範圍。
+- `dataset/utils.py`：兩種dataset共用嘅snapshot命名、deterministic UUID同example schema。
 - `evaluators.py`：row-level同experiment-level deterministic evaluators。
 - `experiment.py`：target factory、experiment metadata同`Client.evaluate()` wiring。
 - `results.py`：LangSmith result normalization、本地artifacts同experiment comparison。

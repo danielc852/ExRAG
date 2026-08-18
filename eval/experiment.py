@@ -8,7 +8,7 @@ from typing import Any, Callable
 from agent import run_agent
 from data import validate_index
 
-from .datasets import get_snapshot_id, load_dataset_snapshot
+from .dataset import get_snapshot_id, load_dataset_snapshot
 from .evaluators import deterministic_evaluator, deterministic_summary_evaluator
 from .runner import select_questions
 from .models import (

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
-from uuid import UUID, NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from data import BenchmarkQuestion
 from data.artifacts import SCHEMA_VERSION
