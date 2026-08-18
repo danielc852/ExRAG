@@ -10,7 +10,7 @@ from data import validate_index
 
 from .datasets import get_snapshot_id, load_dataset_snapshot
 from .evaluators import deterministic_evaluator, deterministic_summary_evaluator
-from .local import select_questions
+from .runner import select_questions
 from .models import (
     LangSmithDatasetConfig,
     LangSmithExperimentConfig,

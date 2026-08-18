@@ -6,7 +6,7 @@ import math
 from statistics import fmean
 from typing import Any
 
-from .local import document_recall, strict_extra_document_count
+from .runner import document_recall, strict_extra_document_count
 
 
 def deterministic_evaluator(

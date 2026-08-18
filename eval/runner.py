@@ -1,4 +1,4 @@
-"""Resumable EnterpriseRAG-Bench answer generation and local metrics."""
+"""Run resumable EnterpriseRAG-Bench evaluations and local metrics."""
 
 from __future__ import annotations
 

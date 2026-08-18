@@ -49,7 +49,7 @@ Root-level `eval.py`已遷移成package，避免local同cloud logic混埋同一�
 eval/
 ├── __init__.py
 ├── models.py
-├── local.py
+├── runner.py
 ├── dataset.py
 ├── datasets/
 │   ├── __init__.py
@@ -64,7 +64,7 @@ eval/
 Responsibilities：
 
 - `models.py`：Pydantic configs、sync result、experiment record、summary同comparison models。
-- `local.py`：原有resumable local evaluation、official answers同local metrics。
+- `runner.py`：resumable local evaluation runner、official answers同local metrics。
 - `dataset.py`：協調dataset type，並將frozen questions同步成immutable LangSmith snapshot。
 - `datasets/sample_data.py`：用`get_sample_questions()`提供sample題目範圍。
 - `datasets/test_data.py`：用`get_full_questions()`返回完整held-out test題目。
