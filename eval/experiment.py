@@ -71,6 +71,7 @@ def _experiment_metadata(
         "chunk_size": index.metadata.get("chunk_size"),
         "chunk_overlap": index.metadata.get("chunk_overlap"),
         "agent_mode": config.agent_mode,
+        "llm_provider": config.llm_provider,
         "model_name": config.model_name,
         "top_k": config.top_k,
         "question_limit": config.question_limit,

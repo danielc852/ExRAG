@@ -6,14 +6,12 @@ import argparse
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator, Literal, Sequence
 
-from agent import DEFAULT_OLLAMA_MODEL, create_ollama_model, create_rag_agent
+from agent import create_rag_agent
 from data import (
     ArtifactLayout,
     DownloadConfig,
@@ -33,6 +31,11 @@ from data.processing.embeddings.openrouter.config import (
     DEFAULT_MODEL as DEFAULT_OPENROUTER_EMBEDDING_MODEL,
 )
 from eval import EvaluationConfig, run_evaluation
+from providers import (
+    DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OLLAMA_URL as PROVIDER_DEFAULT_OLLAMA_URL,
+    get_provider,
+)
 from tools import FaissRetriever, create_retrieval_tool
 
 
@@ -40,7 +43,7 @@ DatasetMode = Literal["sample", "full"]
 
 DEFAULT_ARTIFACT_ROOT = Path(os.getenv("RAG_ARTIFACT_ROOT", "artifacts"))
 DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
-DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", PROVIDER_DEFAULT_OLLAMA_URL)
 DEFAULT_EMBEDDING = os.getenv(
     "EMBEDDING_MODEL", DEFAULT_OPENROUTER_EMBEDDING_MODEL
 )
@@ -86,6 +89,7 @@ def _add_lifecycle_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_agent_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--agent", choices=("simple", "deep"), default="simple")
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--llm", choices=("ollama", "openrouter"), default="ollama")
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--ollama-url", default=DEFAULT_OLLAMA_URL)
 
@@ -238,33 +242,13 @@ def run_init_vectordb(args: argparse.Namespace) -> int:
     return 0
 
 
-def validate_ollama(base_url: str, model_name: str) -> None:
-    request = urllib.request.Request(f"{base_url.rstrip('/')}/api/tags")
-    try:
-        with urllib.request.urlopen(request, timeout=5) as response:
-            payload = json.load(response)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise RuntimeError(
-            f"Cannot reach Ollama at {base_url}. Start Ollama and try again. ({exc})"
-        ) from exc
-    installed = {
-        str(item.get("name") or item.get("model"))
-        for item in payload.get("models", [])
-        if isinstance(item, dict)
-    }
-    requested = (model_name if ":" in model_name else f"{model_name}:latest").casefold()
-    normalized = {
-        (name if ":" in name else f"{name}:latest").casefold() for name in installed
-    }
-    if requested not in normalized:
-        raise RuntimeError(
-            f"Ollama model {model_name!r} is missing. Run: ollama pull {model_name}"
-        )
-
-
 @contextmanager
 def _agent_stack(args: argparse.Namespace) -> Iterator[Any]:
-    validate_ollama(args.ollama_url, args.model)
+    provider = get_provider(args.llm)
+    model = provider.create_chat_model(
+        args.model,
+        base_url=args.ollama_url if args.llm == "ollama" else None,
+    )
     with FaissRetriever.load(_artifact_root(args)) as retriever:
         retrieval_tool = create_retrieval_tool(
             retriever,
@@ -272,7 +256,6 @@ def _agent_stack(args: argparse.Namespace) -> Iterator[Any]:
             include_filters=False,
             use_full_user_question=True,
         )
-        model = create_ollama_model(args.model, args.ollama_url)
         yield create_rag_agent(args.agent, model, retrieval_tool)
 
 
@@ -306,6 +289,7 @@ def run_experiment(args: argparse.Namespace) -> int:
                 SAMPLE_QUESTION_LIMIT if args.dataset_mode == "sample" else None
             ),
             resume=args.resume,
+            llm_provider=args.llm,
             model_name=args.model,
         )
         summary = run_evaluation(config, rag_agent, questions, manifest)

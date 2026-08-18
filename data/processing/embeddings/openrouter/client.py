@@ -4,18 +4,14 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from .config import (
-    API_KEY_ENV_VAR,
-    BASE_URL_ENV_VAR,
-    DEFAULT_BASE_URL,
-    DEFAULT_TIMEOUT_SECONDS,
-)
+from providers.config import OpenRouterConfig
+
+from .config import DEFAULT_BASE_URL, DEFAULT_TIMEOUT_SECONDS
 
 
 class OpenRouterAPIError(RuntimeError):
@@ -41,17 +37,19 @@ class OpenRouterClient:
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
         self._opener = opener
+        self._headers = OpenRouterConfig(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout_seconds=timeout_seconds,
+        ).request_headers()
 
     @classmethod
     def from_env(cls) -> "OpenRouterClient":
-        api_key = os.getenv(API_KEY_ENV_VAR, "").strip()
-        if not api_key:
-            raise RuntimeError(
-                f"{API_KEY_ENV_VAR} is required for the OpenRouter embedding engine"
-            )
+        config = OpenRouterConfig.from_env()
         return cls(
-            api_key,
-            base_url=os.getenv(BASE_URL_ENV_VAR, DEFAULT_BASE_URL),
+            config.api_key,
+            base_url=config.base_url,
+            timeout_seconds=config.timeout_seconds,
         )
 
     def embed(
@@ -78,11 +76,7 @@ class OpenRouterClient:
                     "encoding_format": "float",
                 }
             ).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-                "X-Title": "ExRAG",
-            },
+            headers=self._headers,
             method="POST",
         )
         try:

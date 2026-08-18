@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -92,6 +93,35 @@ def test_resume_rejects_changed_model(tmp_path: Path):
     changed = EvaluationConfig(agent_mode="simple", output_dir=tmp_path, model_name="second")
     with pytest.raises(ValueError, match="model"):
         _write_run_config(changed, manifest, 1)
+
+
+def test_resume_rejects_changed_llm_provider(tmp_path: Path):
+    manifest = index_manifest()
+    first = EvaluationConfig(
+        agent_mode="simple",
+        output_dir=tmp_path,
+        llm_provider="ollama",
+        model_name="shared-model-name",
+    )
+    _write_run_config(first, manifest, 1)
+    changed = first.model_copy(update={"llm_provider": "openrouter"})
+
+    with pytest.raises(ValueError, match="LLM provider"):
+        _write_run_config(changed, manifest, 1)
+
+
+def test_resume_treats_legacy_config_as_ollama(tmp_path: Path):
+    manifest = index_manifest()
+    config = EvaluationConfig(
+        agent_mode="simple", output_dir=tmp_path, model_name="legacy-model"
+    )
+    _write_run_config(config, manifest, 1)
+    path = tmp_path / "config.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    del payload["evaluation"]["llm_provider"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    _write_run_config(config, manifest, 1)
 
 
 def test_evaluation_resumes_completed_answers(tmp_path: Path):

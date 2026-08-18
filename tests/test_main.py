@@ -12,8 +12,8 @@ from main import (
     _download_config,
     _embedding_config,
     build_parser,
-    validate_ollama,
 )
+from providers import OllamaProvider
 
 
 def test_cli_exposes_only_the_three_experiment_pipelines():
@@ -89,7 +89,29 @@ def test_run_experiment_defaults_to_simple_agent():
 
     assert args.dataset_mode == "sample"
     assert args.agent == "simple"
+    assert args.llm == "ollama"
     assert args.model == "hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M"
+
+
+def test_run_experiment_accepts_openrouter_llm_and_model():
+    args = build_parser().parse_args(
+        [
+            "run_exper",
+            "sample",
+            "--llm",
+            "openrouter",
+            "--model",
+            "openai/gpt-4.1-mini",
+        ]
+    )
+
+    assert args.llm == "openrouter"
+    assert args.model == "openai/gpt-4.1-mini"
+
+
+def test_run_experiment_rejects_unknown_llm_provider():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["run_exper", "sample", "--llm", "unknown"])
 
 
 def test_dataset_mode_is_required_and_validated():
@@ -117,4 +139,4 @@ def test_ollama_validation_accepts_normalized_hugging_face_model_name(monkeypatc
 
     monkeypatch.setattr("urllib.request.urlopen", lambda *_args, **_kwargs: Response())
 
-    validate_ollama("http://localhost:11434", DEFAULT_MODEL)
+    OllamaProvider().validate("http://localhost:11434", DEFAULT_MODEL)
