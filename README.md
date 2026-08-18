@@ -85,6 +85,36 @@ experiments and the complete `test` dataset as held-out confirmation. Dataset
 type is derived from the frozen artifact lineage, so a sample index cannot be
 silently evaluated against held-out questions.
 
+## Current code layout
+
+The main runtime boundaries are deliberately small so experiments can change
+one layer without coupling it to the others:
+
+```text
+agent/                         simple and deep RAG agent construction
+data/                          frozen artifacts, processing, embeddings, and FAISS
+providers/                     Ollama and OpenRouter generation providers
+tools/                         retrieval tools exposed to the agents
+eval/
+├── dataset/                   frozen evaluation selection and LangSmith sync
+├── runner.py                  resumable local evaluation and output writing
+├── evaluators.py              deterministic row and summary metrics
+├── experiment.py              LangSmith target and experiment orchestration
+├── models.py                  evaluation configuration and result contracts
+└── results.py                 result normalization and experiment comparison
+```
+
+`eval/dataset/` is the only subpackage under `eval`; use imports such as
+`eval.dataset.sync`. The stable public evaluation API remains available from
+`eval`, while local execution lives in `eval/runner.py`.
+
+Generation is selected through the shared `providers/` interface. Ollama
+remains the default, and OpenRouter can be selected with `--llm openrouter`.
+Embedding is independent of generation: OpenRouter is the default embedding
+engine, with MLX available as the optional local Apple Silicon backend. The
+former Sentence Transformers engine is no longer supported, so indexes created
+with it must be rebuilt.
+
 ## Quick start
 
 The experiment CLI has three pipelines. Choose `sample` for the 1,000-document,
