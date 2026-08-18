@@ -3,7 +3,10 @@ from __future__ import annotations
 import pytest
 
 from main import (
+    DEFAULT_EMBEDDING,
+    DEFAULT_EMBEDDING_ENGINE,
     DEFAULT_MODEL,
+    DEFAULT_TOKENIZER,
     SAMPLE_DOCUMENT_LIMIT,
     _artifact_root,
     _download_config,
@@ -66,6 +69,19 @@ def test_init_vectordb_accepts_mlx_embedding_engine_and_model():
     config = _embedding_config(args)
     assert config.engine == "mlx"
     assert config.model_name == "mlx-community/bge-small-en-v1.5-bf16"
+
+
+def test_init_vectordb_defaults_to_openrouter_nemotron_embeddings():
+    args = build_parser().parse_args(["init_vectordb", "sample"])
+
+    assert args.embedding_engine == DEFAULT_EMBEDDING_ENGINE == "openrouter"
+    assert (
+        args.embedding_model
+        == DEFAULT_EMBEDDING
+        == "nvidia/nemotron-3-embed-1b:free"
+    )
+    assert args.tokenizer_model == DEFAULT_TOKENIZER == "BAAI/bge-base-en-v1.5"
+    assert _embedding_config(args).engine == "openrouter"
 
 
 def test_run_experiment_defaults_to_simple_agent():

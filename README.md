@@ -93,10 +93,17 @@ includes the gold documents for those 10 questions, then uses the configured see
 fill the remaining document slots:
 
 ```bash
+export OPENROUTER_API_KEY=sk-or-v1-...
 python main.py download sample
 python main.py init_vectordb sample
 python main.py run_exper sample
 ```
+
+The default embedding engine is OpenRouter with
+`nvidia/nemotron-3-embed-1b:free`. Document chunks are sent in batches using
+the `document` input type; retrieval questions use the `query` input type. The
+API key is read only from `OPENROUTER_API_KEY` and is never stored in artifact
+manifests.
 
 Replace `sample` with `full` in all three commands for a full experiment. By
 default, the two modes use separate `artifacts/sample` and `artifacts/full`
@@ -115,7 +122,7 @@ ExRAG supports controlled experiments across four main variables:
 | Agent method | `--agent` | `simple` or `deep` |
 | Generation model | `--model` | Any compatible chat model already installed in Ollama |
 | Retrieval depth | `--top-k` | Default number of chunks requested by the retrieval tool; default `5`, maximum `20` |
-| Embedding backend/model | `--embedding-engine`, `--embedding-model` | `sentence-transformers` or compatible `mlx` embeddings |
+| Embedding engine/model | `--embedding-engine`, `--embedding-model` | `openrouter`, `sentence-transformers`, or compatible `mlx` embeddings |
 
 The `simple` method is a bounded LangChain tool-calling agent with at most three
 retrieval calls. The `deep` method uses Deep Agents for multi-step retrieval and
@@ -252,10 +259,49 @@ Experiment outputs can contain benchmark questions, generated answers,
 retrieved document IDs, and retrieved text in traces. Review or redact them
 before sharing, especially when adapting this pipeline to non-synthetic data.
 
+## OpenRouter embeddings
+
+OpenRouter is the default embedding engine and requires no local Torch runtime.
+Set an API key, then rebuild the vector artifacts because embeddings from a
+different model or engine cannot share one FAISS index:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-v1-...
+python main.py init_vectordb sample --rebuild
+```
+
+The defaults can be overridden explicitly:
+
+```bash
+python main.py init_vectordb sample \
+  --embedding-engine openrouter \
+  --embedding-model nvidia/nemotron-3-embed-1b:free \
+  --tokenizer-model BAAI/bge-base-en-v1.5 \
+  --rebuild
+```
+
+`OPENROUTER_BASE_URL` can override the default
+`https://openrouter.ai/api/v1` endpoint. The tokenizer is configured separately
+because an OpenRouter model slug is an API identifier, not necessarily a local
+Hugging Face tokenizer identifier. Responses are validated, converted to
+normalized `float32` arrays, and written to the existing sharded artifact
+format.
+
+For local Sentence Transformers embeddings, install the optional dependency and
+select the engine explicitly:
+
+```bash
+uv sync --extra local
+python main.py init_vectordb sample \
+  --embedding-engine sentence-transformers \
+  --embedding-model BAAI/bge-base-en-v1.5 \
+  --tokenizer-model BAAI/bge-base-en-v1.5 \
+  --rebuild
+```
+
 ## MLX embeddings on Apple Silicon
 
-The vector pipeline supports two embedding engines: the existing
-`sentence-transformers` backend and an optional native `mlx-embeddings` backend.
+The vector pipeline also supports an optional native `mlx-embeddings` engine.
 Install the MLX extra with a native ARM Python on an Apple Silicon Mac running
 macOS 14 or newer:
 

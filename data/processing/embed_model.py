@@ -8,8 +8,10 @@ from typing import Any, Literal
 
 import numpy as np
 
+from .embeddings.openrouter import OpenRouterClient, OpenRouterEmbedder
 
-EmbeddingEngine = Literal["sentence-transformers", "mlx"]
+
+EmbeddingEngine = Literal["sentence-transformers", "mlx", "openrouter"]
 
 
 class MlxEmbeddingModel:
@@ -128,10 +130,20 @@ def create_embedding_model(
 ):
     if engine == "mlx":
         return _create_mlx_embedding_model(model_name, revision)
+    if engine == "openrouter":
+        if revision:
+            raise ValueError("OpenRouter embedding models do not accept revisions")
+        return OpenRouterEmbedder(model_name, client=OpenRouterClient.from_env())
     if engine != "sentence-transformers":
         raise ValueError(f"Unsupported embedding engine: {engine!r}")
 
-    from sentence_transformers import SentenceTransformer
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise RuntimeError(
+            "Sentence Transformers dependencies are missing; install them with "
+            "`uv sync --extra local`"
+        ) from exc
 
     kwargs = {"revision": revision} if revision else {}
     return SentenceTransformer(model_name, **kwargs)
@@ -143,17 +155,20 @@ def encode_chunk_shard(
     *,
     batch_size: int,
     normalize: bool,
+    input_type: Literal["document", "query"] = "document",
 ) -> np.ndarray:
     if not texts:
         dimension = int(model.get_sentence_embedding_dimension())
         return np.empty((0, dimension), dtype=np.float32)
-    vectors = model.encode(
-        texts,
-        batch_size=batch_size,
-        convert_to_numpy=True,
-        normalize_embeddings=normalize,
-        show_progress_bar=False,
-    )
+    kwargs = {
+        "batch_size": batch_size,
+        "convert_to_numpy": True,
+        "normalize_embeddings": normalize,
+        "show_progress_bar": False,
+    }
+    if getattr(model, "supports_input_type", False):
+        kwargs["input_type"] = input_type
+    vectors = model.encode(texts, **kwargs)
     vectors = np.asarray(vectors, dtype=np.float32)
     if normalize:
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)

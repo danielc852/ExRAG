@@ -67,7 +67,11 @@ def embed_chunks(
         texts = [f"Title: {row['title']}\n\n{row['content']}" for row in payloads]
         ids = np.asarray([int(row["integer_id"]) for row in payloads], dtype=np.int64)
         vectors = encode_chunk_shard(
-            model, texts, batch_size=config.batch_size, normalize=config.normalize
+            model,
+            texts,
+            batch_size=config.batch_size,
+            normalize=config.normalize,
+            input_type="document",
         )
         if vectors.ndim != 2 or vectors.shape[0] != ids.shape[0]:
             raise ValueError(f"Embedding output shape does not match chunk shard {unit}")
@@ -110,5 +114,7 @@ def embed_chunks(
         "embedding_dimension": dimension,
         "embedding_dtype": config.dtype,
         "embedding_normalized": config.normalize,
+        "embedding_document_input_type": "document",
+        "embedding_query_input_type": "query",
     }
     return finalize_manifest(layout, manifest)

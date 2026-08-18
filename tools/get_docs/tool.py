@@ -149,6 +149,7 @@ class FaissRetriever:
             [query],
             batch_size=1,
             normalize=True,
+            input_type="query",
         )
         vector = np.asarray(vector, dtype="float32")
         candidate_count = min(top_k * 5, int(self.index.ntotal))

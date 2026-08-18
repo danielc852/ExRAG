@@ -38,10 +38,13 @@ DatasetMode = Literal["sample", "full"]
 DEFAULT_ARTIFACT_ROOT = Path(os.getenv("RAG_ARTIFACT_ROOT", "artifacts"))
 DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-DEFAULT_EMBEDDING = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
-DEFAULT_EMBEDDING_ENGINE = os.getenv(
-    "EMBEDDING_ENGINE", "sentence-transformers"
+DEFAULT_EMBEDDING = os.getenv(
+    "EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b:free"
 )
+DEFAULT_EMBEDDING_ENGINE = os.getenv(
+    "EMBEDDING_ENGINE", "openrouter"
+)
+DEFAULT_TOKENIZER = os.getenv("TOKENIZER_MODEL", "BAAI/bge-base-en-v1.5")
 DEFAULT_REVISION = os.getenv("DATASET_REVISION", "main")
 SAMPLE_DOCUMENT_LIMIT = 1_000
 SAMPLE_QUESTION_LIMIT = 10
@@ -107,12 +110,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_lifecycle_arguments(init_vectordb)
     init_vectordb.add_argument("--chunk-size", type=int, default=512)
     init_vectordb.add_argument("--chunk-overlap", type=int, default=64)
+    init_vectordb.add_argument("--tokenizer-model", default=DEFAULT_TOKENIZER)
     init_vectordb.add_argument("--embedding-model", default=DEFAULT_EMBEDDING)
     init_vectordb.add_argument(
         "--embedding-engine",
-        choices=("sentence-transformers", "mlx"),
+        choices=("sentence-transformers", "mlx", "openrouter"),
         default=DEFAULT_EMBEDDING_ENGINE,
-        help="Embedding inference engine (default: EMBEDDING_ENGINE or sentence-transformers)",
+        help="Embedding inference engine (default: EMBEDDING_ENGINE or openrouter)",
     )
     init_vectordb.add_argument("--embedding-revision")
     init_vectordb.add_argument("--embedding-batch-size", type=int, default=32)
@@ -157,7 +161,7 @@ def _processing_config(args: argparse.Namespace) -> ProcessingConfig:
         artifact_root=_artifact_root(args),
         chunk_size=args.chunk_size,
         chunk_overlap=args.chunk_overlap,
-        tokenizer_model=args.embedding_model,
+        tokenizer_model=args.tokenizer_model,
     )
 
 

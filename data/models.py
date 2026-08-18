@@ -61,8 +61,8 @@ class ProcessingConfig:
 @dataclass(frozen=True)
 class EmbeddingConfig:
     artifact_root: Path = Path("artifacts")
-    engine: Literal["sentence-transformers", "mlx"] = "sentence-transformers"
-    model_name: str = "BAAI/bge-base-en-v1.5"
+    engine: Literal["sentence-transformers", "mlx", "openrouter"] = "openrouter"
+    model_name: str = "nvidia/nemotron-3-embed-1b:free"
     model_revision: str | None = None
     batch_size: int = 32
     dtype: str = "float32"

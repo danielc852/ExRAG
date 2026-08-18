@@ -113,7 +113,12 @@ def configs(root: Path):
     return (
         DownloadConfig(artifact_root=root, document_limit=2, shard_size=1),
         ProcessingConfig(artifact_root=root, tokenizer_model="fake"),
-        EmbeddingConfig(artifact_root=root, model_name="fake", batch_size=2),
+        EmbeddingConfig(
+            artifact_root=root,
+            engine="sentence-transformers",
+            model_name="fake",
+            batch_size=2,
+        ),
         IndexConfig(artifact_root=root, batch_size=1),
     )
 
@@ -338,6 +343,29 @@ def test_encode_chunk_shard_enforces_float32_unit_vectors():
     )
     assert vectors.dtype == np.float32
     np.testing.assert_allclose(np.linalg.norm(vectors, axis=1), np.ones(2))
+
+
+def test_encode_chunk_shard_passes_query_type_to_compatible_embedder():
+    class TypedEmbedding(FakeEmbedding):
+        supports_input_type = True
+
+        def __init__(self):
+            self.input_types = []
+
+        def encode(self, texts, *, input_type, **_kwargs):
+            self.input_types.append(input_type)
+            return np.asarray([[1.0, 0.0] for _text in texts], dtype=np.float32)
+
+    model = TypedEmbedding()
+    encode_chunk_shard(
+        model,
+        ["query"],
+        batch_size=1,
+        normalize=True,
+        input_type="query",
+    )
+
+    assert model.input_types == ["query"]
 
 
 def test_index_validation_rejects_broken_source_lineage(tmp_path, fake_sources):
