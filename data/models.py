@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
+
+
+def _default_embedding_model() -> str:
+    from .processing.embeddings.openrouter.config import DEFAULT_MODEL
+
+    return DEFAULT_MODEL
 
 
 @dataclass(frozen=True)
@@ -62,7 +68,7 @@ class ProcessingConfig:
 class EmbeddingConfig:
     artifact_root: Path = Path("artifacts")
     engine: Literal["sentence-transformers", "mlx", "openrouter"] = "openrouter"
-    model_name: str = "nvidia/nemotron-3-embed-1b:free"
+    model_name: str = field(default_factory=_default_embedding_model)
     model_revision: str | None = None
     batch_size: int = 32
     dtype: str = "float32"

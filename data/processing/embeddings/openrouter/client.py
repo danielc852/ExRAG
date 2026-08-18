@@ -10,8 +10,12 @@ import urllib.request
 from collections.abc import Callable, Sequence
 from typing import Any
 
-
-DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+from .config import (
+    API_KEY_ENV_VAR,
+    BASE_URL_ENV_VAR,
+    DEFAULT_BASE_URL,
+    DEFAULT_TIMEOUT_SECONDS,
+)
 
 
 class OpenRouterAPIError(RuntimeError):
@@ -25,8 +29,8 @@ class OpenRouterClient:
         self,
         api_key: str,
         *,
-        base_url: str = DEFAULT_OPENROUTER_BASE_URL,
-        timeout_seconds: float = 120.0,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         opener: Callable[..., Any] = urllib.request.urlopen,
     ) -> None:
         if not api_key.strip():
@@ -40,16 +44,14 @@ class OpenRouterClient:
 
     @classmethod
     def from_env(cls) -> "OpenRouterClient":
-        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        api_key = os.getenv(API_KEY_ENV_VAR, "").strip()
         if not api_key:
             raise RuntimeError(
-                "OPENROUTER_API_KEY is required for the OpenRouter embedding engine"
+                f"{API_KEY_ENV_VAR} is required for the OpenRouter embedding engine"
             )
         return cls(
             api_key,
-            base_url=os.getenv(
-                "OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL
-            ),
+            base_url=os.getenv(BASE_URL_ENV_VAR, DEFAULT_BASE_URL),
         )
 
     def embed(

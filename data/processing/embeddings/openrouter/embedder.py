@@ -7,10 +7,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from .client import OpenRouterClient
-
-
-DEFAULT_OPENROUTER_EMBEDDING_MODEL = "nvidia/nemotron-3-embed-1b:free"
-KNOWN_MODEL_DIMENSIONS = {DEFAULT_OPENROUTER_EMBEDDING_MODEL: 2048}
+from .config import MODEL_DIMENSIONS
 
 
 class OpenRouterEmbedder:
@@ -28,7 +25,7 @@ class OpenRouterEmbedder:
             raise ValueError("OpenRouter embedding model must not be empty")
         self.model_name = model_name
         self.client = client
-        self._dimension = KNOWN_MODEL_DIMENSIONS.get(model_name)
+        self._dimension = MODEL_DIMENSIONS.get(model_name)
 
     def get_sentence_embedding_dimension(self) -> int:
         if self._dimension is None:

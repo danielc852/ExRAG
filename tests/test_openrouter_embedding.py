@@ -8,11 +8,18 @@ import numpy as np
 import pytest
 
 import data.processing.embed_model as embedding_module
+from data import EmbeddingConfig
 from data.processing.embed_model import create_embedding_model
 from data.processing.embeddings.openrouter import (
+    DEFAULT_MODEL,
     OpenRouterAPIError,
     OpenRouterClient,
     OpenRouterEmbedder,
+)
+from data.processing.embeddings.openrouter.config import (
+    DEFAULT_BASE_URL,
+    DEFAULT_TIMEOUT_SECONDS,
+    MODEL_DIMENSIONS,
 )
 
 
@@ -31,6 +38,14 @@ class FakeResponse:
 
     def close(self):
         return None
+
+
+def test_openrouter_config_defines_default_model_and_transport():
+    assert DEFAULT_MODEL == "nvidia/nemotron-3-embed-1b:free"
+    assert MODEL_DIMENSIONS[DEFAULT_MODEL] == 2048
+    assert DEFAULT_BASE_URL == "https://openrouter.ai/api/v1"
+    assert DEFAULT_TIMEOUT_SECONDS == 120.0
+    assert EmbeddingConfig().model_name == DEFAULT_MODEL
 
 
 def test_openrouter_client_sends_typed_batch_and_orders_response():

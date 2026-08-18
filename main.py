@@ -29,6 +29,9 @@ from data import (
     validate_index,
 )
 from data.artifacts import load_manifest
+from data.processing.embeddings.openrouter.config import (
+    DEFAULT_MODEL as DEFAULT_OPENROUTER_EMBEDDING_MODEL,
+)
 from eval import EvaluationConfig, run_evaluation
 from tools import FaissRetriever, create_retrieval_tool
 
@@ -39,7 +42,7 @@ DEFAULT_ARTIFACT_ROOT = Path(os.getenv("RAG_ARTIFACT_ROOT", "artifacts"))
 DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_EMBEDDING = os.getenv(
-    "EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b:free"
+    "EMBEDDING_MODEL", DEFAULT_OPENROUTER_EMBEDDING_MODEL
 )
 DEFAULT_EMBEDDING_ENGINE = os.getenv(
     "EMBEDDING_ENGINE", "openrouter"
