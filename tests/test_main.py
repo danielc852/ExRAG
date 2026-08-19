@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+
 import pytest
 
 from main import (
@@ -107,6 +111,28 @@ def test_run_experiment_accepts_openrouter_llm_and_model():
 
     assert args.llm == "openrouter"
     assert args.model == "openai/gpt-4.1-mini"
+
+
+def test_run_experiment_defaults_can_select_openrouter_from_environment():
+    environment = os.environ.copy()
+    environment.update(
+        LLM_PROVIDER="openrouter",
+        LLM_MODEL="nvidia/nemotron-3.5-lightning:free",
+    )
+
+    output = subprocess.check_output(
+        [
+            sys.executable,
+            "-c",
+            "from main import build_parser; "
+            "a=build_parser().parse_args(['run_exper','sample']); "
+            "print(a.llm, a.model)",
+        ],
+        env=environment,
+        text=True,
+    )
+
+    assert output.strip() == "openrouter nvidia/nemotron-3.5-lightning:free"
 
 
 def test_run_experiment_rejects_unknown_llm_provider():

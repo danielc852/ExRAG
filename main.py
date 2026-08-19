@@ -42,7 +42,10 @@ from tools import FaissRetriever, create_retrieval_tool
 DatasetMode = Literal["sample", "full"]
 
 DEFAULT_ARTIFACT_ROOT = Path(os.getenv("RAG_ARTIFACT_ROOT", "artifacts"))
-DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+DEFAULT_LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+DEFAULT_MODEL = os.getenv(
+    "LLM_MODEL", os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+)
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", PROVIDER_DEFAULT_OLLAMA_URL)
 DEFAULT_EMBEDDING = os.getenv(
     "EMBEDDING_MODEL", DEFAULT_OPENROUTER_EMBEDDING_MODEL
@@ -89,7 +92,11 @@ def _add_lifecycle_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_agent_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--agent", choices=("simple", "deep"), default="simple")
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--llm", choices=("ollama", "openrouter"), default="ollama")
+    parser.add_argument(
+        "--llm",
+        choices=("ollama", "openrouter"),
+        default=DEFAULT_LLM_PROVIDER,
+    )
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--ollama-url", default=DEFAULT_OLLAMA_URL)
 
