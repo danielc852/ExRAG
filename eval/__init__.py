@@ -3,7 +3,7 @@
 from .dataset import (
     create_snapshot_name,
     get_eval_mode,
-    get_eval_questions,
+    get_questions,
     get_snapshot_id,
     question_to_example,
     sync_frozen_dataset,
@@ -54,7 +54,7 @@ __all__ = [
     "document_recall",
     "evaluate_question",
     "get_eval_mode",
-    "get_eval_questions",
+    "get_questions",
     "get_snapshot_id",
     "load_completed_question_ids",
     "question_to_example",

@@ -21,7 +21,7 @@ def get_eval_mode(source: StageManifest) -> EvaluationDatasetType:
     )
 
 
-def get_eval_questions(
+def get_questions(
     questions: list[BenchmarkQuestion], source: StageManifest
 ) -> list[BenchmarkQuestion]:
     """Return only the questions that belong to the frozen evaluation dataset."""

@@ -18,7 +18,7 @@ from eval import (
     compare_experiments,
     create_snapshot_name,
     get_eval_mode,
-    get_eval_questions,
+    get_questions,
     question_to_example,
     run_langsmith_experiment,
     sync_frozen_dataset,
@@ -134,7 +134,7 @@ def test_eval_mode_and_questions_follow_source_manifest():
     sample = source_manifest()
     sample.metadata["sample_question_limit"] = 2
     assert get_eval_mode(sample) == "sample"
-    assert [item.question_id for item in get_eval_questions(questions, sample)] == [
+    assert [item.question_id for item in get_questions(questions, sample)] == [
         "q1",
         "q2",
     ]
@@ -143,7 +143,7 @@ def test_eval_mode_and_questions_follow_source_manifest():
     full.metadata["corpus_mode"] = "full"
     full.metadata["sample_question_limit"] = None
     assert get_eval_mode(full) == "test"
-    assert get_eval_questions(questions, full) == questions
+    assert get_questions(questions, full) == questions
 
 
 def test_sample_module_returns_its_question_scope():

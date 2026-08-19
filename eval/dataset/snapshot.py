@@ -10,7 +10,7 @@ from data import ArtifactLayout, BenchmarkQuestion, load_frozen_questions
 from data.artifacts import SCHEMA_VERSION, StageManifest, load_manifest
 
 from ..models import LangSmithDatasetConfig
-from .scope import get_eval_mode, get_eval_questions
+from .scope import get_eval_mode, get_questions
 from .utils import EvaluationDatasetType, create_snapshot_name, question_to_example
 
 
@@ -35,7 +35,7 @@ def _source_manifest(config: LangSmithDatasetConfig) -> StageManifest:
 def build_dataset_snapshot(config: LangSmithDatasetConfig) -> DatasetSnapshot:
     source = _source_manifest(config)
     dataset_type = get_eval_mode(source)
-    questions = get_eval_questions(
+    questions = get_questions(
         load_frozen_questions(config.artifact_root), source
     )
     name = create_snapshot_name(

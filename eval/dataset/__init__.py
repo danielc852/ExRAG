@@ -3,7 +3,7 @@
 from . import sample_data
 from .scope import (
     get_eval_mode,
-    get_eval_questions,
+    get_questions,
 )
 from .sync import (
     load_dataset_snapshot,
@@ -20,7 +20,7 @@ __all__ = [
     "EvaluationDatasetType",
     "create_snapshot_name",
     "get_eval_mode",
-    "get_eval_questions",
+    "get_questions",
     "get_snapshot_id",
     "load_dataset_snapshot",
     "question_to_example",
