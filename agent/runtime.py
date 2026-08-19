@@ -11,6 +11,11 @@ from agent.state import AgentMode, AgentRunResult, ToolCallTrace
 
 SIMPLE_RECURSION_LIMIT = 24
 DEEP_RECURSION_LIMIT = 16
+BASELINE_SYSTEM_PROMPT = """You are answering an enterprise benchmark question without
+access to retrieval tools or enterprise documents. Answer directly using only knowledge
+already available to the model. Do not claim to have searched a corpus, and do not invent
+document identifiers, sources, or citations. If you do not know the answer, say so clearly.
+"""
 
 
 def agent_result(
@@ -130,5 +135,44 @@ def run_agent(
             latency_ms=(time.perf_counter() - started) * 1_000,
             model_name=model_name,
             agent_mode=mode,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+
+
+def run_baseline(
+    model,
+    question: str,
+    *,
+    model_name: str,
+    question_id: str | None = None,
+) -> AgentRunResult:
+    """Run one question directly against a chat model without RAG or tools."""
+    question = question.strip()
+    if not question:
+        raise ValueError("question must not be empty")
+    started = time.perf_counter()
+    try:
+        response = model.invoke(
+            [
+                {"role": "system", "content": BASELINE_SYSTEM_PROMPT},
+                {"role": "user", "content": question},
+            ]
+        )
+        return agent_result(
+            [response],
+            question=question,
+            mode="baseline",
+            model_name=model_name,
+            latency_ms=(time.perf_counter() - started) * 1_000,
+            question_id=question_id,
+        )
+    except Exception as exc:
+        return AgentRunResult(
+            question_id=question_id,
+            question=question,
+            answer="",
+            latency_ms=(time.perf_counter() - started) * 1_000,
+            model_name=model_name,
+            agent_mode="baseline",
             error=f"{type(exc).__name__}: {exc}",
         )

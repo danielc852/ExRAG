@@ -210,6 +210,34 @@ def test_langsmith_target_returns_structured_agent_result(monkeypatch):
     assert captured["question_id"] == "q1"
 
 
+def test_langsmith_target_dispatches_direct_model_baseline(monkeypatch):
+    captured = {}
+
+    def fake_run_baseline(_model, question_text, **kwargs):
+        captured.update({"question": question_text, **kwargs})
+        return AgentRunResult(
+            question_id=kwargs["question_id"],
+            question=question_text,
+            answer="Baseline answer",
+            latency_ms=3.0,
+            model_name=kwargs["model_name"],
+            agent_mode="baseline",
+        )
+
+    monkeypatch.setattr(experiment_module, "run_baseline", fake_run_baseline)
+    config = LangSmithExperimentConfig(agent_mode="baseline", question_limit=1)
+    target = build_langsmith_target(object(), config)
+    output = target({"question_id": "q1", "question": "Question?"})
+
+    assert output["answer"] == "Baseline answer"
+    assert output["agent_mode"] == "baseline"
+    assert captured == {
+        "question": "Question?",
+        "model_name": config.model_name,
+        "question_id": "q1",
+    }
+
+
 class FakeExperimentResults:
     def __init__(self, rows):
         self.rows = rows

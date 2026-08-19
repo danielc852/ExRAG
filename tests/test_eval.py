@@ -110,7 +110,19 @@ def test_resume_rejects_changed_llm_provider(tmp_path: Path):
         _write_run_config(changed, manifest, 1)
 
 
-def test_resume_treats_legacy_config_as_ollama(tmp_path: Path):
+def test_resume_rejects_changed_top_k(tmp_path: Path):
+    manifest = index_manifest()
+    first = EvaluationConfig(
+        agent_mode="simple", output_dir=tmp_path, top_k=5
+    )
+    _write_run_config(first, manifest, 1)
+    changed = first.model_copy(update={"top_k": 10})
+
+    with pytest.raises(ValueError, match="top k"):
+        _write_run_config(changed, manifest, 1)
+
+
+def test_resume_treats_legacy_config_as_ollama_with_default_top_k(tmp_path: Path):
     manifest = index_manifest()
     config = EvaluationConfig(
         agent_mode="simple", output_dir=tmp_path, model_name="legacy-model"
@@ -119,6 +131,7 @@ def test_resume_treats_legacy_config_as_ollama(tmp_path: Path):
     path = tmp_path / "config.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     del payload["evaluation"]["llm_provider"]
+    del payload["evaluation"]["top_k"]
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     _write_run_config(config, manifest, 1)
@@ -154,3 +167,28 @@ def test_evaluation_resumes_completed_answers(tmp_path: Path):
     assert second.attempted == 0
     assert fake_agent.calls == 1
     assert load_completed_question_ids(tmp_path / "answers.jsonl") == {"q1"}
+
+
+def test_baseline_evaluation_has_zero_retrieval_metrics(tmp_path: Path):
+    class FakeModel:
+        def invoke(self, _messages):
+            return SimpleNamespace(
+                type="ai",
+                content="Direct answer",
+                tool_calls=[],
+                usage_metadata=None,
+            )
+
+    config = EvaluationConfig(
+        agent_mode="baseline",
+        output_dir=tmp_path,
+        question_limit=1,
+        model_name="model",
+    )
+    summary = run_evaluation(config, FakeModel(), [question()], index_manifest())
+
+    assert summary.completed == 1
+    assert summary.failed == 0
+    assert summary.mean_document_recall == 0.0
+    assert summary.mean_strict_extra_documents == 0.0
+    assert summary.mean_tool_calls == 0.0

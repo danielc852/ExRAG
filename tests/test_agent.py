@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from agent import AgentRunResult, agent_result, create_agent_tools
+from agent import (
+    BASELINE_SYSTEM_PROMPT,
+    AgentRunResult,
+    agent_result,
+    create_agent_tools,
+    run_baseline,
+)
 from agent.runtime import agent_result as runtime_agent_result
 from agent.state import AgentRunResult as StateAgentRunResult
 
@@ -55,3 +61,49 @@ def test_agent_result_collects_stable_document_union_and_usage():
     assert result.tool_calls[0].retrieved_document_ids == ["d1", "d2"]
     assert result.input_tokens == 30
     assert result.output_tokens == 7
+
+
+def test_baseline_calls_model_directly_without_tools_or_documents():
+    class FakeModel:
+        def __init__(self):
+            self.messages = None
+
+        def invoke(self, messages):
+            self.messages = messages
+            return SimpleNamespace(
+                type="ai",
+                content="Direct answer",
+                tool_calls=[],
+                usage_metadata={"input_tokens": 12, "output_tokens": 3},
+            )
+
+    model = FakeModel()
+    result = run_baseline(
+        model,
+        "  Question?  ",
+        model_name="model",
+        question_id="q1",
+    )
+
+    assert model.messages == [
+        {"role": "system", "content": BASELINE_SYSTEM_PROMPT},
+        {"role": "user", "content": "Question?"},
+    ]
+    assert result.answer == "Direct answer"
+    assert result.agent_mode == "baseline"
+    assert result.document_ids == []
+    assert result.tool_calls == []
+    assert result.input_tokens == 12
+    assert result.output_tokens == 3
+
+
+def test_baseline_normalizes_model_errors():
+    class FailingModel:
+        def invoke(self, _messages):
+            raise RuntimeError("provider unavailable")
+
+    result = run_baseline(FailingModel(), "Question?", model_name="model")
+
+    assert result.answer == ""
+    assert result.agent_mode == "baseline"
+    assert result.error == "RuntimeError: provider unavailable"

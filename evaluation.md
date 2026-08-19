@@ -5,9 +5,9 @@
 呢個 repository 有兩條互補嘅 evaluation path：
 
 1. `python main.py run_exper sample|full`：保留本地、可 resume 嘅 answer generation，同時輸出官方相容 `answers.jsonl`。
-2. `eval` package 嘅 LangSmith API：將同一份 frozen benchmark questions 同 agent target 放入 LangSmith，保存 traces，同埋使用 LangSmith workspace 配置嘅 evaluators 進行評分及 experiment comparison。LangSmith 功能唔再係 top-level CLI command。
+2. `eval` package 嘅 LangSmith API：將同一份 frozen benchmark questions 同 baseline／agent target 放入 LangSmith，保存 traces，同埋使用 LangSmith workspace 配置嘅 evaluators 進行評分及 experiment comparison。LangSmith 功能唔再係 top-level CLI command。
 
-兩條 path 必須共用同一個 `AgentRunResult` contract、同一個 frozen question snapshot，同一個 FAISS index lineage。LangSmith 唔會重新下載 Hugging Face dataset，亦唔會將 gold answers、answer facts 或 expected document IDs傳入agent。
+兩條 path 必須共用同一個 `AgentRunResult` contract、同一個 frozen question snapshot，同一個 FAISS index lineage。Baseline 只會驗證同記錄 index lineage，唔會載入 FAISS 或將文件內容傳入 model。LangSmith 唔會重新下載 Hugging Face dataset，亦唔會將 gold answers、answer facts 或 expected document IDs 傳入 target。
 
 ```text
 artifacts/<sample|full>/source/questions.parquet
@@ -16,7 +16,7 @@ artifacts/<sample|full>/source/questions.parquet
               │
               └── LangSmith sample or test dataset
                          ↓
-                  simple / deep target
+             baseline / simple / deep target
                          ↓
                   cloud experiment
                          ↓
@@ -153,6 +153,8 @@ LangSmith target只接收example inputs，並返回：
 
 Nested LangChain／LangGraph calls由LangSmith tracing context捕捉。每題error會結構化寫入output，唔會中止其他examples。
 
+`agent_mode="baseline"` 時，target 直接呼叫相同 provider 建立嘅 chat model，輸入只包含中性 no-retrieval system prompt 同原始問題。輸出沿用同一 contract，但 `document_ids` 同 `tool_calls` 必須為空。`simple`／`deep` 繼續使用原有 agent runtime。
+
 `Client.evaluate()`唔會傳入本地`evaluators`或`summary_evaluators`。需要嘅
 LLM-as-a-judge、code、composite或其他evaluators應該喺LangSmith建立並附加到
 dataset。LangSmith保存嘅feedback仍會喺下載或比較experiment時讀入
@@ -182,11 +184,11 @@ LangSmith operations係cloud-required。API key缺少時要即時回傳可操作
 
 ### Run experiment
 
-由 Python 呼叫 `run_langsmith_experiment()`，並傳入 `LangSmithExperimentConfig` 同已建立嘅 RAG agent。
+由 Python 呼叫 `run_langsmith_experiment()`，並傳入 `LangSmithExperimentConfig` 同對應 answerer：baseline 傳入 chat model，simple／deep 傳入已建立嘅 RAG agent。
 
 `run`要求dataset已sync並同source fingerprint一致。預設每次建立新immutable experiment；第一版唔extend舊experiment。Experiment metadata保存Git commit、LLM provider、agent/model/top-k、question selection、dataset/index/embedding fingerprints、chunking config同corpus mode。
 
-Default concurrency係1。提高concurrency時，retriever嘅SQLite metadata reads會使用thread-safe connection加lock；FAISS只執行read-only search。
+Default concurrency係1。提高concurrency時，retriever嘅SQLite metadata reads會使用thread-safe connection加lock；FAISS只執行read-only search。Baseline runtime 完全唔會開啟 retriever。
 
 ### Compare experiments
 

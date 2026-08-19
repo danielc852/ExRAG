@@ -14,6 +14,7 @@ from providers import DEFAULT_OLLAMA_MODEL, LLMProviderName
 class EvaluationConfig(BaseModel):
     agent_mode: AgentMode
     output_dir: Path
+    top_k: int = Field(default=5, ge=1, le=20)
     question_limit: int | None = None
     question_types: list[str] | None = None
     resume: bool = True

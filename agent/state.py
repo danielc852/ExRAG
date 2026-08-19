@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-AgentMode = Literal["simple", "deep"]
+AgentMode = Literal["baseline", "simple", "deep"]
 
 
 class ToolCallTrace(BaseModel):

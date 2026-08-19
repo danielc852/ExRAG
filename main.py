@@ -90,7 +90,9 @@ def _add_lifecycle_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_agent_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--agent", choices=("simple", "deep"), default="simple")
+    parser.add_argument(
+        "--agent", choices=("baseline", "simple", "deep"), default="simple"
+    )
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument(
         "--llm",
@@ -256,6 +258,9 @@ def _agent_stack(args: argparse.Namespace) -> Iterator[Any]:
         args.model,
         base_url=args.ollama_url if args.llm == "ollama" else None,
     )
+    if args.agent == "baseline":
+        yield model
+        return
     with FaissRetriever.load(_artifact_root(args)) as retriever:
         retrieval_tool = create_retrieval_tool(
             retriever,
@@ -288,10 +293,11 @@ def run_experiment(args: argparse.Namespace) -> int:
             "Index and frozen question artifacts do not share the same source lineage"
         )
     questions = load_frozen_questions(artifact_root)
-    with _agent_stack(args) as rag_agent:
+    with _agent_stack(args) as answerer:
         config = EvaluationConfig(
             agent_mode=args.agent,
             output_dir=_evaluation_output_dir(args),
+            top_k=args.top_k,
             question_limit=(
                 SAMPLE_QUESTION_LIMIT if args.dataset_mode == "sample" else None
             ),
@@ -299,7 +305,7 @@ def run_experiment(args: argparse.Namespace) -> int:
             llm_provider=args.llm,
             model_name=args.model,
         )
-        summary = run_evaluation(config, rag_agent, questions, manifest)
+        summary = run_evaluation(config, answerer, questions, manifest)
     print(summary.model_dump_json(indent=2))
     return 0 if summary.failed == 0 else 1
 

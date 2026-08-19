@@ -6,9 +6,9 @@ reproducible baseline is the starting point, not the final goal: each experiment
 changes a controlled part of the pipeline, records its behavior, and uses the
 evidence to guide the next iteration.
 
-It provides a local data-preparation and FAISS retrieval pipeline, simple and
-deep agent methods, interchangeable generation and embedding models, and local
-or LangSmith evaluation workflows for comparing results.
+It provides a local data-preparation and FAISS retrieval pipeline, a direct-model
+baseline, simple and deep agent methods, interchangeable generation and embedding
+models, and local or LangSmith evaluation workflows for comparing results.
 
 ## Project goal and learning loop
 
@@ -142,23 +142,53 @@ The reproducible record for the rebuilt 2026-08-17 sample run, including its
 scope, models, input sources, output files, and per-question measurements, is in
 [`sample_experiment_2026-08-17.md`](sample_experiment_2026-08-17.md).
 
-## Evaluate different RAG methods and models
+## Evaluate RAG against baselines and models
 
 ExRAG supports controlled experiments across five main variables:
 
 | Variable | CLI option | Supported choices |
 | --- | --- | --- |
-| Agent method | `--agent` | `simple` or `deep` |
+| Answer method | `--agent` | `baseline`, `simple`, or `deep` |
 | LLM provider | `--llm` | `ollama` (default) or `openrouter` |
 | Generation model | `--model` | A concrete model name supported by the selected LLM provider |
 | Retrieval depth | `--top-k` | Default number of chunks requested by the retrieval tool; default `5`, maximum `20` |
 | Embedding engine/model | `--embedding-engine`, `--embedding-model` | `openrouter` or compatible `mlx` embeddings |
 
-The `simple` method is a bounded LangChain tool-calling agent with at most three
-retrieval calls. The `deep` method uses Deep Agents for multi-step retrieval and
-planning, with at most eight retrieval calls and eight model calls. Both methods
-use the same grounded system prompt, FAISS retriever, SQLite metadata store, and
-structured result format.
+The `baseline` method sends the original question directly to the selected chat
+model with a neutral no-retrieval prompt. It does not create an agent, load FAISS,
+call a tool, or send enterprise documents to the model. The `simple` method is a
+bounded LangChain tool-calling agent with at most three retrieval calls. The
+`deep` method uses Deep Agents for multi-step retrieval and planning, with at
+most eight retrieval calls and eight model calls. All methods use the same frozen
+questions and structured result format. Baseline runs still validate and record
+the selected index lineage so their experiment metadata can be compared with the
+matching RAG run; `--top-k` is recorded but has no runtime effect for baseline.
+
+### Compare RAG with the direct-model baseline
+
+Keep the dataset, LLM provider, generation model, and top-k value unchanged.
+Run each method into a separate output directory with `--no-resume`:
+
+```bash
+python main.py run_exper sample \
+  --agent baseline \
+  --model <model> \
+  --top-k 5 \
+  --output-dir runs/sample/baseline-model \
+  --no-resume
+
+python main.py run_exper sample \
+  --agent simple \
+  --model <model> \
+  --top-k 5 \
+  --output-dir runs/sample/simple-model-k5 \
+  --no-resume
+```
+
+Compare answer correctness and completeness with the official benchmark
+evaluator or the same LangSmith evaluators. The deterministic local outputs also
+show retrieval recall, latency, token usage, tool-call count, and failures. A
+baseline run should have no retrieved document IDs and zero tool calls.
 
 ### Compare agent methods
 

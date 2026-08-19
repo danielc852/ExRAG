@@ -12,6 +12,7 @@ from main import (
     DEFAULT_MODEL,
     DEFAULT_TOKENIZER,
     SAMPLE_DOCUMENT_LIMIT,
+    _agent_stack,
     _artifact_root,
     _download_config,
     _embedding_config,
@@ -95,6 +96,36 @@ def test_run_experiment_defaults_to_simple_agent():
     assert args.agent == "simple"
     assert args.llm == "ollama"
     assert args.model == "hf.co/LiquidAI/LFM2.5-2.6B-GGUF:Q4_K_M"
+
+
+def test_run_experiment_accepts_direct_model_baseline():
+    args = build_parser().parse_args(
+        ["run_exper", "sample", "--agent", "baseline"]
+    )
+
+    assert args.agent == "baseline"
+
+
+def test_baseline_agent_stack_does_not_load_retriever(monkeypatch):
+    model = object()
+
+    class FakeProvider:
+        def create_chat_model(self, *_args, **_kwargs):
+            return model
+
+    class RetrieverMustNotLoad:
+        @classmethod
+        def load(cls, _artifact_root):
+            pytest.fail("baseline must not load the retriever")
+
+    monkeypatch.setattr("main.get_provider", lambda _name: FakeProvider())
+    monkeypatch.setattr("main.FaissRetriever", RetrieverMustNotLoad)
+    args = build_parser().parse_args(
+        ["run_exper", "sample", "--agent", "baseline"]
+    )
+
+    with _agent_stack(args) as answerer:
+        assert answerer is model
 
 
 def test_run_experiment_accepts_openrouter_llm_and_model():

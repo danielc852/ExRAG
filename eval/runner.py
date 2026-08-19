@@ -8,7 +8,7 @@ from pathlib import Path
 from statistics import fmean
 from typing import Any
 
-from agent import AgentMode, AgentRunResult, run_agent
+from agent import AgentMode, AgentRunResult, run_agent, run_baseline
 from data import BenchmarkQuestion, StageManifest
 
 from .models import EvaluationConfig, EvaluationSummary
@@ -45,6 +45,13 @@ def evaluate_question(
     mode: AgentMode,
     model_name: str,
 ) -> AgentRunResult:
+    if mode == "baseline":
+        return run_baseline(
+            agent,
+            question.question,
+            model_name=model_name,
+            question_id=question.question_id,
+        )
     return run_agent(
         agent,
         question.question,
@@ -168,6 +175,7 @@ def _write_run_config(
                 config.llm_provider,
             ),
             "model": (existing_evaluation.get("model_name"), config.model_name),
+            "top k": (existing_evaluation.get("top_k", 5), config.top_k),
             "question limit": (
                 existing_evaluation.get("question_limit"),
                 config.question_limit,

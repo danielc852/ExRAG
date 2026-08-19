@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from agent import run_agent
+from agent import run_agent, run_baseline
 from data import validate_index
 
 from .dataset import get_snapshot_id, load_dataset_snapshot
@@ -24,13 +24,21 @@ def build_langsmith_target(
     def target(inputs: dict[str, Any]) -> dict[str, Any]:
         question_id = str(inputs.get("question_id") or "")
         question = str(inputs.get("question") or "")
-        result = run_agent(
-            agent,
-            question,
-            mode=config.agent_mode,
-            model_name=config.model_name,
-            question_id=question_id or None,
-        )
+        if config.agent_mode == "baseline":
+            result = run_baseline(
+                agent,
+                question,
+                model_name=config.model_name,
+                question_id=question_id or None,
+            )
+        else:
+            result = run_agent(
+                agent,
+                question,
+                mode=config.agent_mode,
+                model_name=config.model_name,
+                question_id=question_id or None,
+            )
         return result.model_dump(mode="json")
 
     return target
