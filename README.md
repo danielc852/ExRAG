@@ -98,7 +98,6 @@ tools/                         retrieval tools exposed to the agents
 eval/
 ├── dataset/                   frozen evaluation selection and LangSmith sync
 ├── runner.py                  resumable local evaluation and output writing
-├── evaluators.py              deterministic row and summary metrics
 ├── experiment.py              LangSmith target and experiment orchestration
 ├── models.py                  evaluation configuration and result contracts
 └── results.py                 result normalization and experiment comparison

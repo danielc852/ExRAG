@@ -14,11 +14,9 @@ from eval.dataset import sample_data
 from eval import (
     LangSmithDatasetConfig,
     LangSmithExperimentConfig,
-    aggregate_outputs,
     build_langsmith_target,
     compare_experiments,
     create_snapshot_name,
-    deterministic_evaluator,
     get_eval_mode,
     get_eval_questions,
     question_to_example,
@@ -186,43 +184,6 @@ def test_dataset_sync_rejects_conflicting_examples(tmp_path, frozen_questions):
         sync_frozen_dataset(client, config)
 
 
-def test_deterministic_evaluators_handle_duplicates_empty_gold_and_errors():
-    outputs = {
-        "answer": "",
-        "document_ids": ["d1", "d1", "d3"],
-        "tool_calls": [{"tool_name": "retrieve_documents"}],
-        "latency_ms": 20.0,
-        "input_tokens": None,
-        "output_tokens": 3,
-        "error": "failed",
-    }
-    feedback = {
-        item["key"]: item["score"]
-        for item in deterministic_evaluator(
-            outputs, {"expected_doc_ids": ["d1", "d2"]}
-        )
-    }
-    assert feedback["document_recall"] == 0.5
-    assert feedback["strict_extra_documents"] == 1
-    assert feedback["retrieved_document_count"] == 2
-    assert feedback["run_success"] is False
-    assert feedback["answer_present"] is False
-    assert feedback["input_tokens"] is None
-
-    empty_gold = deterministic_evaluator(outputs, {"expected_doc_ids": []})
-    assert empty_gold[0]["score"] is None
-    assert empty_gold[1]["score"] is None
-
-    aggregate = aggregate_outputs(
-        [outputs, {**outputs, "error": None, "latency_ms": 40.0}],
-        [{"expected_doc_ids": ["d1", "d2"]}, {"expected_doc_ids": []}],
-    )
-    assert aggregate["mean_document_recall"] == 0.5
-    assert aggregate["failure_rate"] == 0.5
-    assert aggregate["mean_latency_ms"] == 30.0
-    assert aggregate["p95_latency_ms"] == pytest.approx(39.0)
-
-
 def test_langsmith_target_returns_structured_agent_result(monkeypatch):
     captured = {}
 
@@ -269,7 +230,6 @@ class FakeExperimentClient(FakeDatasetClient):
         self.evaluate_kwargs = kwargs
         example = kwargs["data"][0]
         outputs = target(example.inputs)
-        feedback = deterministic_evaluator(outputs, example.outputs)
         run = SimpleNamespace(
             id=uuid4(),
             inputs=example.inputs,
@@ -277,12 +237,11 @@ class FakeExperimentClient(FakeDatasetClient):
             reference_example_id=example.id,
             error=None,
         )
-        results = [SimpleNamespace(**item) for item in feedback]
         return FakeExperimentResults(
             [
                 {
                     "run": run,
-                    "evaluation_results": {"results": results},
+                    "evaluation_results": {"results": []},
                 }
             ]
         )
@@ -363,6 +322,8 @@ def test_experiment_runner_wires_langsmith_and_writes_artifacts(
     assert client.evaluate_kwargs["metadata"]["git_commit"] == "commit"
     assert client.evaluate_kwargs["metadata"]["dataset_type"] == "sample"
     assert client.evaluate_kwargs["metadata"]["llm_provider"] == "ollama"
+    assert "evaluators" not in client.evaluate_kwargs
+    assert "summary_evaluators" not in client.evaluate_kwargs
     assert result.summary.completed == 1
     assert (result.output_dir / "answers.jsonl").exists()
     assert (result.output_dir / "records.jsonl").exists()

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import fmean
 from typing import Any, Iterable
 
-from .evaluators import percentile
 from .models import (
     ComparisonMetric,
     ComparisonReport,
@@ -104,6 +104,19 @@ def _mean(values: list[float]) -> float | None:
     return fmean(values) if values else None
 
 
+def _percentile(values: list[float], percentile_value: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * percentile_value
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
 def summarize_records(
     records: list[ExperimentRecord],
     *,
@@ -131,7 +144,7 @@ def summarize_records(
         ),
         failure_rate=failures / len(records) if records else 0.0,
         mean_latency_ms=_mean(latency_values),
-        p95_latency_ms=percentile(latency_values, 0.95),
+        p95_latency_ms=_percentile(latency_values, 0.95),
         mean_tool_calls=_mean(tool_counts),
         mean_input_tokens=_mean(_numeric_values(records, "input_tokens")),
         mean_output_tokens=_mean(_numeric_values(records, "output_tokens")),

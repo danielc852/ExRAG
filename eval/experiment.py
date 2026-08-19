@@ -9,7 +9,6 @@ from agent import run_agent
 from data import validate_index
 
 from .dataset import get_snapshot_id, load_dataset_snapshot
-from .evaluators import deterministic_evaluator, deterministic_summary_evaluator
 from .runner import select_questions
 from .models import (
     LangSmithDatasetConfig,
@@ -135,13 +134,12 @@ def run_langsmith_experiment(
     result = client.evaluate(
         build_langsmith_target(agent, config),
         data=examples,
-        evaluators=[deterministic_evaluator],
-        summary_evaluators=[deterministic_summary_evaluator],
         metadata=metadata,
         experiment_prefix=prefix,
         description=(
-            "EnterpriseRAG-Bench deterministic LangSmith evaluation; answer quality "
-            "remains subject to the official benchmark evaluator"
+            "EnterpriseRAG-Bench LangSmith experiment; evaluators are configured "
+            "in LangSmith and official answer quality remains subject to the "
+            "benchmark evaluator"
         ),
         max_concurrency=config.max_concurrency,
         blocking=True,

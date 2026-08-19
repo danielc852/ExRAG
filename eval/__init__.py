@@ -8,11 +8,6 @@ from .dataset import (
     question_to_example,
     sync_frozen_dataset,
 )
-from .evaluators import (
-    aggregate_outputs,
-    deterministic_evaluator,
-    deterministic_summary_evaluator,
-)
 from .experiment import build_langsmith_target, run_langsmith_experiment
 from .runner import (
     _write_run_config,
@@ -51,14 +46,11 @@ __all__ = [
     "LangSmithExperimentConfig",
     "LangSmithExperimentResult",
     "LangSmithSummary",
-    "aggregate_outputs",
     "append_answer",
     "append_run_detail",
     "build_langsmith_target",
     "compare_experiments",
     "create_snapshot_name",
-    "deterministic_evaluator",
-    "deterministic_summary_evaluator",
     "document_recall",
     "evaluate_question",
     "get_eval_mode",

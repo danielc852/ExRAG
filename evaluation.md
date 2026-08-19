@@ -5,7 +5,7 @@
 呢個 repository 有兩條互補嘅 evaluation path：
 
 1. `python main.py run_exper sample|full`：保留本地、可 resume 嘅 answer generation，同時輸出官方相容 `answers.jsonl`。
-2. `eval` package 嘅 LangSmith API：將同一份 frozen benchmark questions 同 agent target 放入 LangSmith，保存 traces、deterministic feedback、summary metrics 同 experiment comparisons。LangSmith 功能唔再係 top-level CLI command。
+2. `eval` package 嘅 LangSmith API：將同一份 frozen benchmark questions 同 agent target 放入 LangSmith，保存 traces，同埋使用 LangSmith workspace 配置嘅 evaluators 進行評分及 experiment comparison。LangSmith 功能唔再係 top-level CLI command。
 
 兩條 path 必須共用同一個 `AgentRunResult` contract、同一個 frozen question snapshot，同一個 FAISS index lineage。LangSmith 唔會重新下載 Hugging Face dataset，亦唔會將 gold answers、answer facts 或 expected document IDs傳入agent。
 
@@ -18,8 +18,6 @@ artifacts/<sample|full>/source/questions.parquet
                          ↓
                   simple / deep target
                          ↓
-               deterministic evaluators
-                         ↓
                   cloud experiment
                          ↓
         answers.jsonl + records.jsonl + summary.json
@@ -29,15 +27,10 @@ artifacts/<sample|full>/source/questions.parquet
 
 EnterpriseRAG-Bench官方 leaderboard使用GPT-5.4 Medium Reasoning判斷answer correctness、answer completeness同Invalid Extra Documents。呢啲判斷涉及語意同candidate document relevance，唔可以用簡單set comparison冒充。
 
-LangSmith第一版只提供可重現嘅code-based metrics：
-
-- Document recall。
-- Strict extra document count；只代表candidate IDs減gold IDs，唔等同官方Invalid Extra Docs。
-- Retrieved document count。
-- Tool-call count。
-- Run success及answer presence。
-- Latency。
-- Input/output tokens；provider冇提供時為null。
+Repository唔會註冊自訂code evaluator或summary evaluator。需要 correctness、
+groundedness、relevance 或其他 feedback 時，應該喺 LangSmith workspace／dataset
+配置適合嘅 evaluator。咁可以集中管理 evaluator prompt、model同版本，並將相同
+評分規則套用到多個experiments。
 
 正式benchmark仍然要將本repo產生嘅`answers.jsonl`交畀EnterpriseRAG-Bench官方evaluation harness。
 
@@ -55,7 +48,6 @@ eval/
 │   ├── sync.py
 │   ├── sample_data.py
 │   └── utils.py
-├── evaluators.py
 ├── experiment.py
 └── results.py
 ```
@@ -67,8 +59,7 @@ Responsibilities：
 - `dataset/sync.py`：協調dataset type，並將frozen questions同步成immutable LangSmith snapshot。
 - `dataset/sample_data.py`：用`get_sample_questions()`提供sample題目範圍。
 - `dataset/utils.py`：兩種dataset共用嘅snapshot命名、deterministic UUID同example schema。
-- `evaluators.py`：row-level同experiment-level deterministic evaluators。
-- `experiment.py`：target factory、experiment metadata同`Client.evaluate()` wiring。
+- `experiment.py`：target factory、experiment metadata同`Client.evaluate()` wiring；評分器由LangSmith管理。
 - `results.py`：LangSmith result normalization、本地artifacts同experiment comparison。
 - `__init__.py`：只re-export穩定public API，保留現有`from eval import ...` imports。
 
@@ -106,7 +97,7 @@ Inputs只包含target可以睇到嘅資料：
 }
 ```
 
-Reference outputs只供evaluators使用：
+Reference outputs只供LangSmith或官方benchmark evaluators使用：
 
 ```json
 {
@@ -158,21 +149,14 @@ LangSmith target只接收example inputs，並返回：
 
 Nested LangChain／LangGraph calls由LangSmith tracing context捕捉。每題error會結構化寫入output，唔會中止其他examples。
 
-Row evaluator一次返回以下feedback：
+`Client.evaluate()`唔會傳入本地`evaluators`或`summary_evaluators`。需要嘅
+LLM-as-a-judge、code、composite或其他evaluators應該喺LangSmith建立並附加到
+dataset。LangSmith保存嘅feedback仍會喺下載或比較experiment時讀入
+`ExperimentRecord.feedback`。
 
-| Key | Value | Direction |
-| --- | --- | --- |
-| `document_recall` | 0–1；empty gold為null | higher |
-| `strict_extra_documents` | integer；empty gold為null | lower |
-| `retrieved_document_count` | integer | diagnostic |
-| `tool_call_count` | integer | diagnostic |
-| `run_success` | boolean | higher |
-| `answer_present` | boolean | higher |
-| `latency_ms` | float | lower |
-| `input_tokens` | integer或null | lower |
-| `output_tokens` | integer或null | lower |
-
-Summary evaluator計算mean document recall、mean strict extras、failure rate、mean/p95 latency、mean tool calls同mean token usage。Null values唔會當零分。
+本地`summary.json`只係由run outputs整理執行狀態、latency、tool calls同token
+usage，唔會作為LangSmith evaluator執行或上傳自訂feedback。正式benchmark仍以
+官方evaluation harness為準。
 
 ## 6. CLI and Runtime Behavior
 
