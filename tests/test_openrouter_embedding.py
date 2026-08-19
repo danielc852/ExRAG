@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 from types import SimpleNamespace
@@ -138,6 +139,25 @@ def test_openrouter_client_retries_rate_limits_using_retry_after():
     assert vectors == [[1.0, 2.0]]
     assert len(attempts) == 2
     assert delays == [0.0]
+
+
+def test_openrouter_client_retries_remote_disconnects():
+    attempts = []
+    delays = []
+
+    def retry_once(*_args, **_kwargs):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise http.client.RemoteDisconnected("connection closed")
+        return FakeResponse({"data": [{"index": 0, "embedding": [1, 2]}]})
+
+    client = OpenRouterClient("secret", opener=retry_once, sleeper=delays.append)
+
+    vectors = client.embed(model="model", texts=["text"], input_type="document")
+
+    assert vectors == [[1.0, 2.0]]
+    assert len(attempts) == 2
+    assert delays == [1.0]
 
 
 def test_openrouter_embedder_batches_and_normalizes_float32_vectors():

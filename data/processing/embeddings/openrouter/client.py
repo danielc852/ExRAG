@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import math
 import time
@@ -102,6 +103,13 @@ class OpenRouterClient:
                     raise OpenRouterAPIError(
                         "OpenRouter embeddings request failed with "
                         f"HTTP {exc.code}: {detail}"
+                    ) from exc
+                except http.client.RemoteDisconnected as exc:
+                    if attempt < self._max_retries:
+                        self._sleeper(min(30.0, float(2**attempt)))
+                        continue
+                    raise OpenRouterAPIError(
+                        "OpenRouter embeddings API repeatedly closed the connection"
                     ) from exc
         except urllib.error.URLError as exc:
             raise OpenRouterAPIError(
