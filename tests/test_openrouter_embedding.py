@@ -106,12 +106,38 @@ def test_openrouter_client_reports_provider_error_without_api_key():
     def fail_request(*_args, **_kwargs):
         raise error
 
-    client = OpenRouterClient("secret", opener=fail_request)
+    client = OpenRouterClient("secret", opener=fail_request, max_retries=0)
 
     with pytest.raises(OpenRouterAPIError, match="HTTP 429: rate limited") as caught:
         client.embed(model="model", texts=["text"], input_type="query")
 
     assert "secret" not in str(caught.value)
+
+
+def test_openrouter_client_retries_rate_limits_using_retry_after():
+    error = urllib.error.HTTPError(
+        "https://openrouter.test/embeddings",
+        429,
+        "Too Many Requests",
+        {"Retry-After": "0"},
+        FakeResponse({"error": {"message": "rate limited"}}),
+    )
+    attempts = []
+    delays = []
+
+    def retry_once(*_args, **_kwargs):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise error
+        return FakeResponse({"data": [{"index": 0, "embedding": [1, 2]}]})
+
+    client = OpenRouterClient("secret", opener=retry_once, sleeper=delays.append)
+
+    vectors = client.embed(model="model", texts=["text"], input_type="query")
+
+    assert vectors == [[1.0, 2.0]]
+    assert len(attempts) == 2
+    assert delays == [0.0]
 
 
 def test_openrouter_embedder_batches_and_normalizes_float32_vectors():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Sequence
@@ -28,15 +29,21 @@ class OpenRouterClient:
         base_url: str = DEFAULT_BASE_URL,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         opener: Callable[..., Any] = urllib.request.urlopen,
+        max_retries: int = 6,
+        sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
         if not api_key.strip():
             raise ValueError("OpenRouter API key must not be empty")
         if timeout_seconds <= 0:
             raise ValueError("OpenRouter timeout must be positive")
+        if max_retries < 0:
+            raise ValueError("OpenRouter max retries must not be negative")
         self._api_key = api_key.strip()
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
         self._opener = opener
+        self._max_retries = max_retries
+        self._sleeper = sleeper
         self._headers = OpenRouterConfig(
             api_key=self._api_key,
             base_url=self._base_url,
@@ -80,13 +87,22 @@ class OpenRouterClient:
             method="POST",
         )
         try:
-            with self._opener(request, timeout=self._timeout_seconds) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            detail = self._http_error_detail(exc)
-            raise OpenRouterAPIError(
-                f"OpenRouter embeddings request failed with HTTP {exc.code}: {detail}"
-            ) from exc
+            for attempt in range(self._max_retries + 1):
+                try:
+                    with self._opener(
+                        request, timeout=self._timeout_seconds
+                    ) as response:
+                        payload = json.loads(response.read().decode("utf-8"))
+                    break
+                except urllib.error.HTTPError as exc:
+                    if exc.code == 429 and attempt < self._max_retries:
+                        self._sleeper(self._retry_delay(exc, attempt))
+                        continue
+                    detail = self._http_error_detail(exc)
+                    raise OpenRouterAPIError(
+                        "OpenRouter embeddings request failed with "
+                        f"HTTP {exc.code}: {detail}"
+                    ) from exc
         except urllib.error.URLError as exc:
             raise OpenRouterAPIError(
                 f"Cannot reach OpenRouter embeddings API: {exc.reason}"
@@ -99,6 +115,16 @@ class OpenRouterClient:
             ) from exc
 
         return self._parse_embeddings(payload, expected_count=len(texts))
+
+    @staticmethod
+    def _retry_delay(exc: urllib.error.HTTPError, attempt: int) -> float:
+        retry_after = exc.headers.get("Retry-After") if exc.headers else None
+        if retry_after is not None:
+            try:
+                return max(0.0, float(retry_after))
+            except ValueError:
+                pass
+        return min(30.0, float(2**attempt))
 
     @staticmethod
     def _http_error_detail(exc: urllib.error.HTTPError) -> str:
