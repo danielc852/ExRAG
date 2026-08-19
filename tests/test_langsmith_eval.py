@@ -299,7 +299,6 @@ def test_experiment_runner_wires_langsmith_and_writes_artifacts(
         ),
     )
     monkeypatch.setattr(experiment_module, "validate_index", lambda _root: index)
-    monkeypatch.setattr(experiment_module, "_git_commit", lambda: "commit")
     monkeypatch.setattr(
         experiment_module,
         "run_agent",
@@ -321,7 +320,6 @@ def test_experiment_runner_wires_langsmith_and_writes_artifacts(
     result = run_langsmith_experiment(client, config, object())
     assert client.evaluate_kwargs["blocking"] is True
     assert client.evaluate_kwargs["max_concurrency"] == 1
-    assert client.evaluate_kwargs["metadata"]["git_commit"] == "commit"
     assert client.evaluate_kwargs["metadata"]["dataset_type"] == "sample"
     assert client.evaluate_kwargs["metadata"]["llm_provider"] == "ollama"
     assert "evaluators" not in client.evaluate_kwargs

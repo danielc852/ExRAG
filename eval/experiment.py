@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from typing import Any, Callable
 
 from agent import run_agent
@@ -37,16 +36,6 @@ def build_langsmith_target(
     return target
 
 
-def _git_commit() -> str:
-    completed = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    return completed.stdout.strip() if completed.returncode == 0 else "unknown"
-
-
 def _experiment_metadata(
     config: LangSmithExperimentConfig,
     *,
@@ -56,7 +45,6 @@ def _experiment_metadata(
     question_ids: list[str],
 ) -> dict[str, Any]:
     return {
-        "git_commit": _git_commit(),
         "dataset_id": str(dataset.id),
         "dataset_name": str(dataset.name),
         "dataset_type": dataset.metadata.get("dataset_type"),
