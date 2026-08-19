@@ -21,6 +21,16 @@ from ..models import EmbeddingConfig
 from .embed_model import create_embedding_model, encode_chunk_shard
 
 
+MAX_EMBEDDING_TITLE_CHARACTERS = 256
+
+
+def _embedding_text(title: str, content: str) -> str:
+    """Add useful titles without letting malformed titles consume the payload."""
+    if len(title) > MAX_EMBEDDING_TITLE_CHARACTERS:
+        return content
+    return f"Title: {title}\n\n{content}"
+
+
 def _save_npy_atomic(path: Path, values: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -64,7 +74,7 @@ def embed_chunks(
             continue
         table = pq.read_table(layout.processed / chunk_shard.path)
         payloads = table.to_pylist()
-        texts = [f"Title: {row['title']}\n\n{row['content']}" for row in payloads]
+        texts = [_embedding_text(row["title"], row["content"]) for row in payloads]
         ids = np.asarray([int(row["integer_id"]) for row in payloads], dtype=np.int64)
         vectors = encode_chunk_shard(
             model,

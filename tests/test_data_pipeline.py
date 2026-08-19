@@ -32,6 +32,7 @@ from data import (
 from data.artifacts import fingerprint, load_manifest, write_manifest_atomic
 from data.preprocessing.clean_data import normalize_text
 from data.processing.embed_model import encode_chunk_shard
+from data.processing.process import _embedding_text
 from tools import FaissRetriever
 
 
@@ -68,6 +69,11 @@ class FakeEmbedding:
             lowered = text.lower()
             vectors.append([1.0, 0.0] if "alpha" in lowered else [0.0, 1.0])
         return np.asarray(vectors, dtype=np.float32)
+
+
+def test_embedding_text_omits_pathologically_long_titles():
+    assert _embedding_text("Normal title", "Body") == "Title: Normal title\n\nBody"
+    assert _embedding_text("x" * 257, "Body") == "Body"
 
 
 @pytest.fixture
