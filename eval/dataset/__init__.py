@@ -1,9 +1,11 @@
 """Selection, serialization, and synchronization for evaluation datasets."""
 
 from . import sample_data
-from .sync import (
+from .scope import (
     get_eval_mode,
     get_eval_questions,
+)
+from .sync import (
     load_dataset_snapshot,
     sync_frozen_dataset,
 )

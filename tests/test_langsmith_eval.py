@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-import eval.dataset.sync as dataset_module
+import eval.dataset.snapshot as dataset_snapshot_module
 import eval.experiment as experiment_module
 from agent import AgentRunResult
 from data import BenchmarkQuestion, StageManifest
@@ -98,9 +98,11 @@ class FakeDatasetClient:
 def frozen_questions(monkeypatch):
     questions = [question("q1"), question("q2"), question("q3")]
     manifest = source_manifest()
-    monkeypatch.setattr(dataset_module, "_source_manifest", lambda _config: manifest)
     monkeypatch.setattr(
-        dataset_module, "load_frozen_questions", lambda _root: questions
+        dataset_snapshot_module, "_source_manifest", lambda _config: manifest
+    )
+    monkeypatch.setattr(
+        dataset_snapshot_module, "load_frozen_questions", lambda _root: questions
     )
     return questions, manifest
 
